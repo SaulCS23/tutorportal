@@ -1,4 +1,5 @@
 import { Bell } from "lucide-react";
+import UserAvatar from "@/components/nav/UserAvatar";
 
 interface TopBarProps {
   title: string;
@@ -18,13 +19,7 @@ export default function TopBar({ title }: TopBarProps) {
         >
           <Bell size={18} aria-hidden="true" />
         </button>
-        <div
-          aria-label="Student: Daniel Cohen"
-          role="img"
-          className="w-8 h-8 rounded-full bg-primary text-white text-xs font-bold flex items-center justify-center select-none"
-        >
-          DC
-        </div>
+        <UserAvatar />
       </div>
     </header>
   );

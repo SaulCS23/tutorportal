@@ -47,17 +47,15 @@ export default async function AccountPage() {
           </div>
         </section>
 
-        {/* Update name */}
-        {profile && (
-          <section aria-labelledby="update-name-heading">
-            <h2 id="update-name-heading" className="text-sm font-semibold text-muted-text uppercase tracking-wide mb-3">
-              Update Name
-            </h2>
-            <div className="bg-card-bg border border-soft-border rounded-2xl shadow-card p-6">
-              <AccountForm currentFullName={profile.full_name} />
-            </div>
-          </section>
-        )}
+        {/* Update name — always shown so users without a profile row can set their name */}
+        <section aria-labelledby="update-name-heading">
+          <h2 id="update-name-heading" className="text-sm font-semibold text-muted-text uppercase tracking-wide mb-3">
+            Update Name
+          </h2>
+          <div className="bg-card-bg border border-soft-border rounded-2xl shadow-card p-6">
+            <AccountForm currentFullName={profile?.full_name ?? ""} />
+          </div>
+        </section>
       </div>
     </div>
   );
