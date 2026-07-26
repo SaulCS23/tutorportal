@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, BookOpen, CalendarDays } from "lucide-react";
+import { LayoutDashboard, BookOpen, CalendarDays, User } from "lucide-react";
 
 const links = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/homework", label: "Homework", icon: BookOpen },
   { href: "/schedule", label: "Schedule", icon: CalendarDays },
+  { href: "/account", label: "Account", icon: User },
 ];
 
 export default function BottomNav() {

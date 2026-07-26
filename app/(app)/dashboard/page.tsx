@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { getCurrentProfile } from "@/lib/supabase/helpers";
 import TopBar from "@/components/nav/TopBar";
 import StatusBadge from "@/components/ui/StatusBadge";
 import SectionHeading from "@/components/ui/SectionHeading";
@@ -39,7 +40,11 @@ const weeklySchedule = [
   { day: "Sunday", course: "AP Calculus BC" },
 ];
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
+  const profile = await getCurrentProfile();
+  const firstName = profile?.full_name?.split(" ")[0] ?? "Student";
+  const accountType = profile?.role === "teacher" ? "Teacher" : "Student";
+
   return (
     <div>
       <TopBar title="Dashboard" />
@@ -47,11 +52,14 @@ export default function DashboardPage() {
       {/* Welcome */}
       <div className="mb-8">
         <h2 className="text-2xl font-bold text-dark-text">
-          Welcome back, Daniel 👋
+          Welcome back, {firstName} 👋
         </h2>
         <p className="mt-1 text-muted-text">
           Here is what is coming up this week.
         </p>
+        <span className="inline-flex items-center mt-2 px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-primary border border-blue-100">
+          {accountType}
+        </span>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">

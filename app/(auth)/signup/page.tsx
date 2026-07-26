@@ -5,8 +5,10 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 
 export default function SignUpPage() {
+  const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
@@ -14,6 +16,20 @@ export default function SignUpPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+
+    if (!fullName.trim()) {
+      setError("Full name is required.");
+      return;
+    }
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters.");
+      return;
+    }
+    if (password !== confirm) {
+      setError("Passwords do not match.");
+      return;
+    }
+
     setLoading(true);
 
     const supabase = createClient();
@@ -21,6 +37,7 @@ export default function SignUpPage() {
       email,
       password,
       options: {
+        data: { full_name: fullName.trim() },
         emailRedirectTo: `${window.location.origin}/auth/callback`,
       },
     });
@@ -46,20 +63,14 @@ export default function SignUpPage() {
             strokeWidth={2}
             aria-hidden="true"
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M5 13l4 4L19 7"
-            />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
           </svg>
         </div>
-        <h1 className="text-xl font-bold text-dark-text mb-2">
-          Check your email
-        </h1>
+        <h1 className="text-xl font-bold text-dark-text mb-2">Check your email</h1>
         <p className="text-sm text-muted-text leading-relaxed">
           We sent a confirmation link to{" "}
-          <span className="font-medium text-dark-text">{email}</span>. Open it
-          to activate your account, then sign in.
+          <span className="font-medium text-dark-text">{email}</span>. Open it to
+          activate your account, then sign in.
         </p>
         <Link
           href="/login"
@@ -82,10 +93,23 @@ export default function SignUpPage() {
 
       <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
         <div className="flex flex-col gap-1.5">
-          <label
-            htmlFor="email"
-            className="text-sm font-medium text-dark-text"
-          >
+          <label htmlFor="fullName" className="text-sm font-medium text-dark-text">
+            Full Name
+          </label>
+          <input
+            id="fullName"
+            type="text"
+            autoComplete="name"
+            required
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            placeholder="Jane Smith"
+            className="w-full px-3.5 py-2.5 text-sm bg-page-bg border border-soft-border rounded-xl text-dark-text placeholder:text-muted-text focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition"
+          />
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="email" className="text-sm font-medium text-dark-text">
             Email
           </label>
           <input
@@ -101,10 +125,7 @@ export default function SignUpPage() {
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label
-            htmlFor="password"
-            className="text-sm font-medium text-dark-text"
-          >
+          <label htmlFor="password" className="text-sm font-medium text-dark-text">
             Password
           </label>
           <input
@@ -116,6 +137,22 @@ export default function SignUpPage() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Min. 6 characters"
+            className="w-full px-3.5 py-2.5 text-sm bg-page-bg border border-soft-border rounded-xl text-dark-text placeholder:text-muted-text focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition"
+          />
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="confirm" className="text-sm font-medium text-dark-text">
+            Confirm Password
+          </label>
+          <input
+            id="confirm"
+            type="password"
+            autoComplete="new-password"
+            required
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+            placeholder="Repeat password"
             className="w-full px-3.5 py-2.5 text-sm bg-page-bg border border-soft-border rounded-xl text-dark-text placeholder:text-muted-text focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition"
           />
         </div>
@@ -140,10 +177,7 @@ export default function SignUpPage() {
 
       <p className="mt-6 text-center text-sm text-muted-text">
         Already have an account?{" "}
-        <Link
-          href="/login"
-          className="text-primary font-medium hover:underline"
-        >
+        <Link href="/login" className="text-primary font-medium hover:underline">
           Sign in
         </Link>
       </p>
