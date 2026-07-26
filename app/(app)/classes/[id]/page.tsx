@@ -6,6 +6,9 @@ import { getCurrentProfile } from "@/lib/supabase/helpers";
 import { getInitials } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/server";
 import TopBar from "@/components/nav/TopBar";
+import CopyCodeButton from "@/components/classes/CopyCodeButton";
+import EditClassForm from "@/components/classes/EditClassForm";
+import RemoveStudentButton from "@/components/classes/RemoveStudentButton";
 import DeleteClassButton from "@/components/classes/DeleteClassButton";
 import LeaveClassButton from "@/components/classes/LeaveClassButton";
 
@@ -13,34 +16,30 @@ export const metadata: Metadata = { title: "Class" };
 
 type Props = { params: Promise<{ id: string }> };
 
+type ClassRow = {
+  id: string;
+  name: string;
+  subject: string | null;
+  teacher_id: string;
+  join_code: string;
+  created_at: string;
+};
+
+type StudentRow = {
+  student_id: string;
+  full_name: string;
+  email: string;
+  joined_at: string;
+};
+
 export default async function ClassDetailPage({ params }: Props) {
   const { id } = await params;
 
-  const profile = await getCurrentProfile();
-  // Layout guards unauthenticated access; profile may be null for legacy accounts.
+  const [profile, supabase] = await Promise.all([
+    getCurrentProfile(),
+    createClient(),
+  ]);
 
-  const supabase = await createClient();
-
-  type ClassRow = {
-    id: string;
-    name: string;
-    subject: string | null;
-    teacher_id: string;
-    join_code: string;
-    created_at: string;
-  };
-
-  type MemberRow = {
-    student_id: string;
-    joined_at: string;
-  };
-
-  type ProfileRow = {
-    id: string;
-    full_name: string;
-  };
-
-  // RLS ensures only the teacher or an enrolled student can see this row
   const { data: cls } = await supabase
     .from("classes")
     .select("id, name, subject, teacher_id, join_code, created_at")
@@ -50,52 +49,33 @@ export default async function ClassDetailPage({ params }: Props) {
   if (!cls) notFound();
 
   const typedCls = cls as ClassRow;
-  const isOwner = profile?.role === "teacher" && typedCls.teacher_id === profile?.id;
+  const isOwner =
+    profile?.role === "teacher" && typedCls.teacher_id === profile?.id;
   const isStudent = profile?.role === "student";
 
-  // Teacher name — covered by profiles RLS policies added in migration
-  const { data: teacherData } = await supabase
-    .from("profiles")
-    .select("full_name")
-    .eq("id", typedCls.teacher_id)
-    .single();
-
-  const teacherName = (teacherData as { full_name: string } | null)?.full_name ?? "Unknown";
-
-  // Member count — visible to both teacher and enrolled student
-  const { count: memberCount } = await supabase
-    .from("class_members")
-    .select("*", { count: "exact", head: true })
-    .eq("class_id", id);
-
-  // Full member list — only fetched for the owning teacher
-  let members: (MemberRow & { profile: ProfileRow | null })[] = [];
-
-  if (isOwner) {
-    const { data: memberRows } = await supabase
+  const [teacherResult, countResult] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("full_name")
+      .eq("id", typedCls.teacher_id)
+      .single(),
+    supabase
       .from("class_members")
-      .select("student_id, joined_at")
-      .eq("class_id", id)
-      .order("joined_at", { ascending: true });
+      .select("*", { count: "exact", head: true })
+      .eq("class_id", id),
+  ]);
 
-    const rows = (memberRows as MemberRow[]) ?? [];
+  const teacherName =
+    (teacherResult.data as { full_name: string } | null)?.full_name ??
+    "Unknown";
+  const memberCount = countResult.count ?? 0;
 
-    if (rows.length > 0) {
-      const studentIds = rows.map((r) => r.student_id);
-      const { data: profileRows } = await supabase
-        .from("profiles")
-        .select("id, full_name")
-        .in("id", studentIds);
-
-      const profileMap = new Map(
-        ((profileRows as ProfileRow[]) ?? []).map((p) => [p.id, p])
-      );
-
-      members = rows.map((r) => ({
-        ...r,
-        profile: profileMap.get(r.student_id) ?? null,
-      }));
-    }
+  let students: StudentRow[] = [];
+  if (isOwner) {
+    const { data } = await supabase.rpc("get_class_students", {
+      p_class_id: id,
+    });
+    students = (data as StudentRow[]) ?? [];
   }
 
   const formatDate = (iso: string) =>
@@ -109,7 +89,6 @@ export default async function ClassDetailPage({ params }: Props) {
     <div>
       <TopBar title={typedCls.name} initials={getInitials(profile?.full_name)} />
 
-      {/* Back link */}
       <div className="mb-5">
         <Link
           href="/classes"
@@ -121,23 +100,29 @@ export default async function ClassDetailPage({ params }: Props) {
       </div>
 
       <div className="max-w-2xl flex flex-col gap-6">
-        {/* Class summary card */}
+        {/* Class summary */}
         <section
           aria-labelledby="class-info-heading"
           className="bg-card-bg border border-soft-border rounded-2xl shadow-card p-6"
         >
-          <h2 id="class-info-heading" className="sr-only">Class information</h2>
+          <h2 id="class-info-heading" className="sr-only">
+            Class information
+          </h2>
 
           <div className="flex items-start justify-between gap-4 mb-5">
             <div>
-              <h2 className="text-xl font-bold text-dark-text">{typedCls.name}</h2>
+              <h2 className="text-xl font-bold text-dark-text">
+                {typedCls.name}
+              </h2>
               {typedCls.subject && (
-                <p className="mt-0.5 text-sm text-muted-text">{typedCls.subject}</p>
+                <p className="mt-0.5 text-sm text-muted-text">
+                  {typedCls.subject}
+                </p>
               )}
             </div>
             <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-text shrink-0">
               <Users size={13} aria-hidden="true" />
-              {memberCount ?? 0} {(memberCount ?? 0) === 1 ? "member" : "members"}
+              {memberCount} {memberCount === 1 ? "member" : "members"}
             </span>
           </div>
 
@@ -148,18 +133,53 @@ export default async function ClassDetailPage({ params }: Props) {
             </div>
             <div className="flex justify-between gap-4">
               <dt className="text-muted-text">Created</dt>
-              <dd className="font-medium text-dark-text">{formatDate(typedCls.created_at)}</dd>
+              <dd className="font-medium text-dark-text">
+                {formatDate(typedCls.created_at)}
+              </dd>
             </div>
-            {isOwner && (
-              <div className="flex justify-between gap-4 mt-1 pt-3 border-t border-soft-border">
-                <dt className="text-muted-text">Join Code</dt>
-                <dd className="font-mono font-bold text-dark-text tracking-widest text-base">
-                  {typedCls.join_code}
-                </dd>
-              </div>
-            )}
           </dl>
         </section>
+
+        {/* Teacher: join code */}
+        {isOwner && (
+          <section
+            aria-labelledby="join-code-heading"
+            className="bg-card-bg border border-soft-border rounded-2xl shadow-card p-6"
+          >
+            <h2
+              id="join-code-heading"
+              className="text-sm font-semibold text-muted-text uppercase tracking-wide mb-4"
+            >
+              Join Code
+            </h2>
+            <div className="flex items-center justify-between gap-4">
+              <span className="font-mono font-bold text-dark-text tracking-widest text-2xl">
+                {typedCls.join_code}
+              </span>
+              <CopyCodeButton code={typedCls.join_code} />
+            </div>
+          </section>
+        )}
+
+        {/* Teacher: edit class */}
+        {isOwner && (
+          <section
+            aria-labelledby="edit-class-heading"
+            className="bg-card-bg border border-soft-border rounded-2xl shadow-card p-6"
+          >
+            <h2
+              id="edit-class-heading"
+              className="text-sm font-semibold text-muted-text uppercase tracking-wide mb-4"
+            >
+              Edit Details
+            </h2>
+            <EditClassForm
+              classId={typedCls.id}
+              currentName={typedCls.name}
+              currentSubject={typedCls.subject}
+            />
+          </section>
+        )}
 
         {/* Teacher: student roster */}
         {isOwner && (
@@ -171,25 +191,36 @@ export default async function ClassDetailPage({ params }: Props) {
               Students
             </h2>
 
-            {members.length === 0 ? (
+            {students.length === 0 ? (
               <div className="bg-card-bg border border-soft-border rounded-2xl shadow-card p-6 text-sm text-muted-text text-center">
                 No students have joined yet. Share the join code above.
               </div>
             ) : (
-              <ul className="bg-card-bg border border-soft-border rounded-2xl shadow-card divide-y divide-soft-border" role="list">
-                {members.map((m) => (
+              <ul
+                className="bg-card-bg border border-soft-border rounded-2xl shadow-card divide-y divide-soft-border"
+                role="list"
+              >
+                {students.map((s) => (
                   <li
-                    key={m.student_id}
+                    key={s.student_id}
                     className="flex items-center justify-between gap-4 px-5 py-3.5 first:rounded-t-2xl last:rounded-b-2xl"
                   >
-                    <div>
-                      <p className="text-sm font-medium text-dark-text">
-                        {m.profile?.full_name ?? "Unknown Student"}
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-dark-text truncate">
+                        {s.full_name ?? "Unknown Student"}
+                      </p>
+                      <p className="text-xs text-muted-text truncate">
+                        {s.email}
                       </p>
                       <p className="text-xs text-muted-text">
-                        Joined {formatDate(m.joined_at)}
+                        Joined {formatDate(s.joined_at)}
                       </p>
                     </div>
+                    <RemoveStudentButton
+                      classId={typedCls.id}
+                      studentId={s.student_id}
+                      studentName={s.full_name ?? "this student"}
+                    />
                   </li>
                 ))}
               </ul>
@@ -197,13 +228,32 @@ export default async function ClassDetailPage({ params }: Props) {
           </section>
         )}
 
-        {/* Actions */}
-        <section aria-label="Class actions">
-          {isOwner && <DeleteClassButton classId={typedCls.id} />}
-          {isStudent && profile && (
+        {/* Teacher: danger zone */}
+        {isOwner && (
+          <section
+            aria-labelledby="danger-heading"
+            className="bg-card-bg border border-red-200 rounded-2xl shadow-card p-6"
+          >
+            <h2
+              id="danger-heading"
+              className="text-sm font-semibold text-red-500 uppercase tracking-wide mb-4"
+            >
+              Danger Zone
+            </h2>
+            <p className="text-sm text-muted-text mb-4">
+              Deleting this class is permanent and will remove all enrolled
+              students.
+            </p>
+            <DeleteClassButton classId={typedCls.id} />
+          </section>
+        )}
+
+        {/* Student: leave class */}
+        {isStudent && profile && (
+          <section aria-label="Class actions">
             <LeaveClassButton classId={typedCls.id} studentId={profile.id} />
-          )}
-        </section>
+          </section>
+        )}
       </div>
     </div>
   );

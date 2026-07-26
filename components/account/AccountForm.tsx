@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { updateFullNameAction } from "@/app/actions/profile";
 
 export default function AccountForm({ currentFullName }: { currentFullName: string }) {
   const router = useRouter();
@@ -27,13 +27,10 @@ export default function AccountForm({ currentFullName }: { currentFullName: stri
     }
 
     setLoading(true);
-    const supabase = createClient();
-    const { error: rpcError } = await supabase.rpc("update_own_full_name", {
-      new_full_name: fullName.trim(),
-    });
+    const result = await updateFullNameAction(fullName.trim());
 
-    if (rpcError) {
-      setError(rpcError.message);
+    if (result.error) {
+      setError(result.error);
       setLoading(false);
       return;
     }
