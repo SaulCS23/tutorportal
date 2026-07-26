@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { GraduationCap } from "lucide-react";
 import { getCurrentProfile } from "@/lib/supabase/helpers";
 import { createClient } from "@/lib/supabase/server";
@@ -12,10 +11,11 @@ export const metadata: Metadata = { title: "My Classes" };
 
 export default async function ClassesPage() {
   const profile = await getCurrentProfile();
-  if (!profile) redirect("/login");
+  // Layout guards unauthenticated access; profile may be null for accounts
+  // whose row in public.profiles was not created by the trigger.
 
   const supabase = await createClient();
-  const isTeacher = profile.role === "teacher";
+  const isTeacher = profile?.role === "teacher";
 
   type TeacherClass = {
     id: string;
@@ -40,14 +40,14 @@ export default async function ClassesPage() {
   let studentMemberships: StudentMembership[] = [];
   let studentClasses: ClassRow[] = [];
 
-  if (isTeacher) {
+  if (isTeacher && profile) {
     const { data } = await supabase
       .from("classes")
       .select("id, name, subject, join_code, created_at")
       .eq("teacher_id", profile.id)
       .order("created_at", { ascending: false });
     teacherClasses = (data as TeacherClass[]) ?? [];
-  } else {
+  } else if (profile) {
     // Fetch memberships
     const { data: memberships } = await supabase
       .from("class_members")

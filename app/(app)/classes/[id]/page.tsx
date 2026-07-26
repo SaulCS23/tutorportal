@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { ChevronLeft, Users } from "lucide-react";
 import { getCurrentProfile } from "@/lib/supabase/helpers";
 import { createClient } from "@/lib/supabase/server";
@@ -16,7 +16,7 @@ export default async function ClassDetailPage({ params }: Props) {
   const { id } = await params;
 
   const profile = await getCurrentProfile();
-  if (!profile) redirect("/login");
+  // Layout guards unauthenticated access; profile may be null for legacy accounts.
 
   const supabase = await createClient();
 
@@ -49,8 +49,8 @@ export default async function ClassDetailPage({ params }: Props) {
   if (!cls) notFound();
 
   const typedCls = cls as ClassRow;
-  const isOwner = profile.role === "teacher" && typedCls.teacher_id === profile.id;
-  const isStudent = profile.role === "student";
+  const isOwner = profile?.role === "teacher" && typedCls.teacher_id === profile?.id;
+  const isStudent = profile?.role === "student";
 
   // Teacher name — covered by profiles RLS policies added in migration
   const { data: teacherData } = await supabase
@@ -199,7 +199,7 @@ export default async function ClassDetailPage({ params }: Props) {
         {/* Actions */}
         <section aria-label="Class actions">
           {isOwner && <DeleteClassButton classId={typedCls.id} />}
-          {isStudent && (
+          {isStudent && profile && (
             <LeaveClassButton classId={typedCls.id} studentId={profile.id} />
           )}
         </section>

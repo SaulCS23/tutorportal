@@ -9,13 +9,16 @@ export const metadata: Metadata = { title: "Account" };
 export default async function AccountPage() {
   const [user, profile] = await Promise.all([getCurrentUser(), getCurrentProfile()]);
 
-  if (!user || !profile) redirect("/login");
+  if (!user) redirect("/login");
+  // profile may be null for accounts whose profiles row was not yet created
 
-  const roleLabel = profile.role === "teacher" ? "Teacher" : "Student";
-  const memberSince = new Date(profile.created_at).toLocaleDateString("en-US", {
-    month: "long",
-    year: "numeric",
-  });
+  const roleLabel = profile?.role === "teacher" ? "Teacher" : "Student";
+  const memberSince = profile
+    ? new Date(profile.created_at).toLocaleDateString("en-US", {
+        month: "long",
+        year: "numeric",
+      })
+    : null;
 
   return (
     <div>
@@ -30,7 +33,7 @@ export default async function AccountPage() {
           <div className="bg-card-bg border border-soft-border rounded-2xl shadow-card divide-y divide-soft-border">
             <dl>
               <Row label="Email" value={user.email ?? "—"} />
-              <Row label="Full Name" value={profile.full_name} />
+              <Row label="Full Name" value={profile?.full_name ?? "—"} />
               <Row
                 label="Account Type"
                 value={
@@ -39,20 +42,22 @@ export default async function AccountPage() {
                   </span>
                 }
               />
-              <Row label="Member Since" value={memberSince} />
+              {memberSince && <Row label="Member Since" value={memberSince} />}
             </dl>
           </div>
         </section>
 
         {/* Update name */}
-        <section aria-labelledby="update-name-heading">
-          <h2 id="update-name-heading" className="text-sm font-semibold text-muted-text uppercase tracking-wide mb-3">
-            Update Name
-          </h2>
-          <div className="bg-card-bg border border-soft-border rounded-2xl shadow-card p-6">
-            <AccountForm currentFullName={profile.full_name} />
-          </div>
-        </section>
+        {profile && (
+          <section aria-labelledby="update-name-heading">
+            <h2 id="update-name-heading" className="text-sm font-semibold text-muted-text uppercase tracking-wide mb-3">
+              Update Name
+            </h2>
+            <div className="bg-card-bg border border-soft-border rounded-2xl shadow-card p-6">
+              <AccountForm currentFullName={profile.full_name} />
+            </div>
+          </section>
+        )}
       </div>
     </div>
   );
