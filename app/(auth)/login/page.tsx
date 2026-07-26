@@ -1,12 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
-export default function LoginPage() {
+const URL_ERROR_MESSAGES: Record<string, string> = {
+  auth_callback_failed: "The confirmation link has expired or is invalid. Please try again.",
+  session_expired: "Your password reset link has expired. Please request a new one.",
+};
+
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const urlError = searchParams.get("error");
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -33,6 +41,8 @@ export default function LoginPage() {
     router.refresh();
   }
 
+  const displayError = error || (urlError ? URL_ERROR_MESSAGES[urlError] ?? urlError : "");
+
   return (
     <div className="bg-card-bg border border-soft-border rounded-2xl shadow-card p-8">
       <div className="mb-6">
@@ -44,10 +54,7 @@ export default function LoginPage() {
 
       <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
         <div className="flex flex-col gap-1.5">
-          <label
-            htmlFor="email"
-            className="text-sm font-medium text-dark-text"
-          >
+          <label htmlFor="email" className="text-sm font-medium text-dark-text">
             Email
           </label>
           <input
@@ -63,12 +70,17 @@ export default function LoginPage() {
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label
-            htmlFor="password"
-            className="text-sm font-medium text-dark-text"
-          >
-            Password
-          </label>
+          <div className="flex items-center justify-between">
+            <label htmlFor="password" className="text-sm font-medium text-dark-text">
+              Password
+            </label>
+            <Link
+              href="/forgot-password"
+              className="text-xs text-primary hover:underline"
+            >
+              Forgot password?
+            </Link>
+          </div>
           <input
             id="password"
             type="password"
@@ -81,12 +93,12 @@ export default function LoginPage() {
           />
         </div>
 
-        {error && (
+        {displayError && (
           <p
             role="alert"
             className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-3.5 py-2.5"
           >
-            {error}
+            {displayError}
           </p>
         )}
 
@@ -101,13 +113,18 @@ export default function LoginPage() {
 
       <p className="mt-6 text-center text-sm text-muted-text">
         Don&apos;t have an account?{" "}
-        <Link
-          href="/signup"
-          className="text-primary font-medium hover:underline"
-        >
+        <Link href="/signup" className="text-primary font-medium hover:underline">
           Sign up
         </Link>
       </p>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
   );
 }
