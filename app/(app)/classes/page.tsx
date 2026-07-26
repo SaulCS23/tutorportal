@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { GraduationCap } from "lucide-react";
 import { getCurrentProfile } from "@/lib/supabase/helpers";
+import { getInitials } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/server";
 import TopBar from "@/components/nav/TopBar";
 import CreateClassForm from "@/components/classes/CreateClassForm";
@@ -72,7 +73,7 @@ export default async function ClassesPage() {
 
   return (
     <div>
-      <TopBar title="My Classes" />
+      <TopBar title="My Classes" initials={getInitials(profile?.full_name)} />
 
       {isTeacher ? (
         <>

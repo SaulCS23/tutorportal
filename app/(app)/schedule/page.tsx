@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { getCurrentProfile } from "@/lib/supabase/helpers";
+import { getInitials } from "@/lib/utils";
 import TopBar from "@/components/nav/TopBar";
 import LessonCard from "@/components/cards/LessonCard";
 import SectionHeading from "@/components/ui/SectionHeading";
@@ -51,10 +53,12 @@ const previousLessons = [
   },
 ];
 
-export default function SchedulePage() {
+export default async function SchedulePage() {
+  const profile = await getCurrentProfile();
+
   return (
     <div>
-      <TopBar title="Schedule" />
+      <TopBar title="Schedule" initials={getInitials(profile?.full_name)} />
 
       <div className="mb-8">
         <p className="text-muted-text text-sm">

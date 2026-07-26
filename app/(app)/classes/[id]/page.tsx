@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronLeft, Users } from "lucide-react";
 import { getCurrentProfile } from "@/lib/supabase/helpers";
+import { getInitials } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/server";
 import TopBar from "@/components/nav/TopBar";
 import DeleteClassButton from "@/components/classes/DeleteClassButton";
@@ -106,7 +107,7 @@ export default async function ClassDetailPage({ params }: Props) {
 
   return (
     <div>
-      <TopBar title={typedCls.name} />
+      <TopBar title={typedCls.name} initials={getInitials(profile?.full_name)} />
 
       {/* Back link */}
       <div className="mb-5">

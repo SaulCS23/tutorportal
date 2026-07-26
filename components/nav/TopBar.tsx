@@ -1,11 +1,11 @@
 import { Bell } from "lucide-react";
-import UserAvatar from "@/components/nav/UserAvatar";
 
 interface TopBarProps {
   title: string;
+  initials?: string;
 }
 
-export default function TopBar({ title }: TopBarProps) {
+export default function TopBar({ title, initials = "?" }: TopBarProps) {
   return (
     <header className="flex items-center justify-between h-14 px-4 md:px-0 border-b border-soft-border md:border-none bg-card-bg md:bg-transparent mb-6">
       <h1 className="text-base font-semibold text-dark-text md:text-xl md:font-bold">
@@ -19,7 +19,13 @@ export default function TopBar({ title }: TopBarProps) {
         >
           <Bell size={18} aria-hidden="true" />
         </button>
-        <UserAvatar />
+        <div
+          role="img"
+          aria-label="User avatar"
+          className="w-8 h-8 rounded-full bg-primary text-white text-xs font-bold flex items-center justify-center select-none"
+        >
+          {initials}
+        </div>
       </div>
     </header>
   );

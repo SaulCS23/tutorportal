@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getCurrentUser, getCurrentProfile } from "@/lib/supabase/helpers";
+import { getInitials } from "@/lib/utils";
 import TopBar from "@/components/nav/TopBar";
 import AccountForm from "@/components/account/AccountForm";
 
@@ -22,7 +23,7 @@ export default async function AccountPage() {
 
   return (
     <div>
-      <TopBar title="Account" />
+      <TopBar title="Account" initials={getInitials(profile?.full_name)} />
 
       <div className="max-w-lg flex flex-col gap-6">
         {/* Account info */}

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { getCurrentProfile } from "@/lib/supabase/helpers";
+import { getInitials } from "@/lib/utils";
 import TopBar from "@/components/nav/TopBar";
 import StatusBadge from "@/components/ui/StatusBadge";
 import SectionHeading from "@/components/ui/SectionHeading";
@@ -44,10 +45,11 @@ export default async function DashboardPage() {
   const profile = await getCurrentProfile();
   const firstName = profile?.full_name?.split(" ")[0] ?? "Student";
   const accountType = profile?.role === "teacher" ? "Teacher" : "Student";
+  const initials = getInitials(profile?.full_name);
 
   return (
     <div>
-      <TopBar title="Dashboard" />
+      <TopBar title="Dashboard" initials={initials} />
 
       {/* Welcome */}
       <div className="mb-8">
