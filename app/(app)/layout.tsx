@@ -1,7 +1,22 @@
+import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
 import AppNav from "@/components/nav/AppNav";
 import BottomNav from "@/components/nav/BottomNav";
 
-export default function AppLayout({ children }: { children: React.ReactNode }) {
+export default async function AppLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
   return (
     <div className="min-h-screen bg-page-bg">
       <div className="max-w-6xl mx-auto px-4 md:px-8 py-6 flex gap-10">
