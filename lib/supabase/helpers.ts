@@ -1,5 +1,21 @@
 import { createClient } from "@/lib/supabase/server";
 
+export type Class = {
+  id: string;
+  name: string;
+  subject: string | null;
+  teacher_id: string;
+  join_code: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ClassMember = {
+  class_id: string;
+  student_id: string;
+  joined_at: string;
+};
+
 export type Profile = {
   id: string;
   full_name: string;
