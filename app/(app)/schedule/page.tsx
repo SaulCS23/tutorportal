@@ -208,7 +208,9 @@ export default async function SchedulePage() {
                               className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:text-primary-dark transition-colors mt-1"
                             >
                               <LinkIcon size={14} aria-hidden="true" />
-                              Join Meeting
+                              {s.meeting_provider === "Google Meet"
+                                ? "Join Google Meet"
+                                : "Join Meeting"}
                             </a>
                           )}
                         </div>

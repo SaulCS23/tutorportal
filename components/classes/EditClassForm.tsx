@@ -8,16 +8,25 @@ interface EditClassFormProps {
   classId: string;
   currentName: string;
   currentSubject: string | null;
+  currentDescription?: string | null;
+  currentStartDate?: string | null;
 }
+
+const inputCls =
+  "w-full px-3.5 py-2.5 text-sm bg-page-bg border border-soft-border rounded-xl text-dark-text placeholder:text-muted-text focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition";
 
 export default function EditClassForm({
   classId,
   currentName,
   currentSubject,
+  currentDescription,
+  currentStartDate,
 }: EditClassFormProps) {
   const router = useRouter();
   const [name, setName] = useState(currentName);
   const [subject, setSubject] = useState(currentSubject ?? "");
+  const [description, setDescription] = useState(currentDescription ?? "");
+  const [startDate, setStartDate] = useState(currentStartDate ?? "");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
@@ -32,15 +41,6 @@ export default function EditClassForm({
       return;
     }
 
-    const unchanged =
-      name.trim() === currentName &&
-      (subject.trim() || null) === (currentSubject || null);
-
-    if (unchanged) {
-      setError("No changes to save.");
-      return;
-    }
-
     setLoading(true);
     const supabase = createClient();
     const { error: dbError } = await supabase
@@ -48,6 +48,8 @@ export default function EditClassForm({
       .update({
         name: name.trim(),
         subject: subject.trim() || null,
+        description: description.trim() || null,
+        start_date: startDate || null,
         updated_at: new Date().toISOString(),
       })
       .eq("id", classId);
@@ -74,28 +76,53 @@ export default function EditClassForm({
           type="text"
           required
           value={name}
-          onChange={(e) => {
-            setName(e.target.value);
-            setSuccess(false);
-          }}
-          className="w-full px-3.5 py-2.5 text-sm bg-page-bg border border-soft-border rounded-xl text-dark-text placeholder:text-muted-text focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition"
+          onChange={(e) => { setName(e.target.value); setSuccess(false); }}
+          className={inputCls}
         />
       </div>
 
+      <div className="grid sm:grid-cols-2 gap-3">
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="classSubject" className="text-sm font-medium text-dark-text">
+            Subject{" "}
+            <span className="font-normal text-muted-text">(optional)</span>
+          </label>
+          <input
+            id="classSubject"
+            type="text"
+            value={subject}
+            onChange={(e) => { setSubject(e.target.value); setSuccess(false); }}
+            className={inputCls}
+          />
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="classStartDate" className="text-sm font-medium text-dark-text">
+            Start Date{" "}
+            <span className="font-normal text-muted-text">(optional)</span>
+          </label>
+          <input
+            id="classStartDate"
+            type="date"
+            value={startDate}
+            onChange={(e) => { setStartDate(e.target.value); setSuccess(false); }}
+            className={inputCls}
+          />
+        </div>
+      </div>
+
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="classSubject" className="text-sm font-medium text-dark-text">
-          Subject{" "}
+        <label htmlFor="classDescription" className="text-sm font-medium text-dark-text">
+          Description{" "}
           <span className="font-normal text-muted-text">(optional)</span>
         </label>
-        <input
-          id="classSubject"
-          type="text"
-          value={subject}
-          onChange={(e) => {
-            setSubject(e.target.value);
-            setSuccess(false);
-          }}
-          className="w-full px-3.5 py-2.5 text-sm bg-page-bg border border-soft-border rounded-xl text-dark-text placeholder:text-muted-text focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition"
+        <textarea
+          id="classDescription"
+          rows={2}
+          value={description}
+          onChange={(e) => { setDescription(e.target.value); setSuccess(false); }}
+          placeholder="Brief description for students…"
+          className={`${inputCls} resize-y`}
         />
       </div>
 
@@ -113,7 +140,7 @@ export default function EditClassForm({
           role="status"
           className="text-sm text-success bg-green-50 border border-green-200 rounded-xl px-3.5 py-2.5"
         >
-          Class updated successfully.
+          Class updated.
         </p>
       )}
 

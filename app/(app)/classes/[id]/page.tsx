@@ -21,6 +21,8 @@ type ClassRow = {
   id: string;
   name: string;
   subject: string | null;
+  description: string | null;
+  start_date: string | null;
   teacher_id: string;
   join_code: string;
   created_at: string;
@@ -86,7 +88,9 @@ export default async function ClassDetailPage({ params }: Props) {
 
   const { data: cls } = await supabase
     .from("classes")
-    .select("id, name, subject, teacher_id, join_code, created_at")
+    .select(
+      "id, name, subject, description, start_date, teacher_id, join_code, created_at"
+    )
     .eq("id", id)
     .single();
 
@@ -193,11 +197,25 @@ export default async function ClassDetailPage({ params }: Props) {
             </span>
           </div>
 
+          {typedCls.description && (
+            <p className="text-sm text-dark-text leading-relaxed mb-4">
+              {typedCls.description}
+            </p>
+          )}
+
           <dl className="flex flex-col gap-2 text-sm border-t border-soft-border pt-4">
             <div className="flex justify-between gap-4">
               <dt className="text-muted-text">Teacher</dt>
               <dd className="font-medium text-dark-text">{teacherName}</dd>
             </div>
+            {typedCls.start_date && (
+              <div className="flex justify-between gap-4">
+                <dt className="text-muted-text">Start Date</dt>
+                <dd className="font-medium text-dark-text">
+                  {formatDate(typedCls.start_date)}
+                </dd>
+              </div>
+            )}
             <div className="flex justify-between gap-4">
               <dt className="text-muted-text">Created</dt>
               <dd className="font-medium text-dark-text">
@@ -296,7 +314,9 @@ export default async function ClassDetailPage({ params }: Props) {
                             className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:text-primary-dark transition-colors mt-1"
                           >
                             <LinkIcon size={14} aria-hidden="true" />
-                            Join Meeting
+                            {s.meeting_provider === "Google Meet"
+                              ? "Join Google Meet"
+                              : "Join Meeting"}
                           </a>
                         )}
                       </div>
@@ -430,6 +450,8 @@ export default async function ClassDetailPage({ params }: Props) {
               classId={typedCls.id}
               currentName={typedCls.name}
               currentSubject={typedCls.subject}
+              currentDescription={typedCls.description}
+              currentStartDate={typedCls.start_date}
             />
           </section>
         )}

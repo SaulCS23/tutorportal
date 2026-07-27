@@ -20,8 +20,8 @@ const DAY_OPTIONS = [
 ];
 
 const PROVIDER_OPTIONS = [
-  { value: "Zoom", label: "Zoom" },
   { value: "Google Meet", label: "Google Meet" },
+  { value: "Zoom", label: "Zoom" },
   { value: "Microsoft Teams", label: "Microsoft Teams" },
   { value: "Other", label: "Other" },
   { value: "In person", label: "In person" },
@@ -200,7 +200,9 @@ export default function ScheduleCard({ schedule }: { schedule: ClassSchedule }) 
                 className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline mt-1"
               >
                 <LinkIcon size={12} aria-hidden="true" />
-                Join Meeting
+                {schedule.meeting_provider === "Google Meet"
+                  ? "Join Google Meet"
+                  : "Join Meeting"}
               </a>
             )}
           </div>
@@ -323,7 +325,7 @@ export default function ScheduleCard({ schedule }: { schedule: ClassSchedule }) 
                     type="url"
                     value={meetingLink}
                     onChange={(e) => setMeetingLink(e.target.value)}
-                    placeholder="https://zoom.us/j/..."
+                    placeholder="https://meet.google.com/abc-defg-hij"
                     className={inputCls}
                   />
                 </div>

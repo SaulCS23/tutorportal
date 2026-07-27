@@ -16,8 +16,8 @@ const DAY_OPTIONS = [
 ];
 
 const PROVIDER_OPTIONS = [
-  { value: "Zoom", label: "Zoom" },
   { value: "Google Meet", label: "Google Meet" },
+  { value: "Zoom", label: "Zoom" },
   { value: "Microsoft Teams", label: "Microsoft Teams" },
   { value: "Other", label: "Other" },
   { value: "In person", label: "In person" },
@@ -264,7 +264,7 @@ export default function CreateScheduleForm({ classId }: { classId: string }) {
               type="url"
               value={meetingLink}
               onChange={(e) => setMeetingLink(e.target.value)}
-              placeholder="https://zoom.us/j/..."
+              placeholder="https://meet.google.com/abc-defg-hij"
               className={inputCls}
             />
           </div>

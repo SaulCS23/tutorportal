@@ -6,7 +6,11 @@ type Status =
   | "completed"
   | "overdue"
   | "draft"
-  | "published";
+  | "published"
+  | "graded"
+  | "returned"
+  | "late"
+  | "missing";
 
 const config: Record<Status, { label: string; className: string }> = {
   "not-started": {
@@ -19,7 +23,7 @@ const config: Record<Status, { label: string; className: string }> = {
   },
   submitted: {
     label: "Submitted",
-    className: "bg-green-50 text-green-700 ring-1 ring-green-200",
+    className: "bg-blue-50 text-blue-700 ring-1 ring-blue-200",
   },
   upcoming: {
     label: "Upcoming",
@@ -40,6 +44,22 @@ const config: Record<Status, { label: string; className: string }> = {
   published: {
     label: "Published",
     className: "bg-green-50 text-green-700 ring-1 ring-green-200",
+  },
+  graded: {
+    label: "Graded",
+    className: "bg-green-50 text-green-700 ring-1 ring-green-200",
+  },
+  returned: {
+    label: "Returned",
+    className: "bg-purple-50 text-purple-700 ring-1 ring-purple-200",
+  },
+  late: {
+    label: "Late",
+    className: "bg-orange-50 text-orange-700 ring-1 ring-orange-200",
+  },
+  missing: {
+    label: "Missing",
+    className: "bg-red-50 text-red-600 ring-1 ring-red-200",
   },
 };
 

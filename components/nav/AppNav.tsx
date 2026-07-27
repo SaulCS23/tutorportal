@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, BookOpen, CalendarDays, GraduationCap, User } from "lucide-react";
+import { LayoutDashboard, BookOpen, CalendarDays, GraduationCap, User, Award } from "lucide-react";
 import SignOutButton from "@/components/auth/SignOutButton";
 
 const links = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/classes", label: "Classes", icon: GraduationCap },
   { href: "/homework", label: "Homework", icon: BookOpen },
+  { href: "/grades", label: "Grades", icon: Award },
   { href: "/schedule", label: "Schedule", icon: CalendarDays },
   { href: "/account", label: "Account", icon: User },
 ];

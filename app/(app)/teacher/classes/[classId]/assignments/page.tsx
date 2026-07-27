@@ -42,7 +42,7 @@ export default async function AssignmentsPage({ params }: Props) {
         <ul className="flex flex-col gap-4" role="list">
           {assignments.map((a) => (
             <li key={a.id}>
-              <AssignmentCard assignment={a} />
+              <AssignmentCard assignment={a} classId={classId} />
             </li>
           ))}
         </ul>

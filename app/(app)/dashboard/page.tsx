@@ -407,7 +407,9 @@ function NextMeetingCard({ meeting }: { meeting: ScheduleRow | null }) {
             className="w-full flex items-center justify-center gap-2 bg-white/20 border border-white/30 text-white text-sm font-medium rounded-xl py-2.5 hover:bg-white/30 transition-colors"
           >
             <LinkIcon size={14} aria-hidden="true" />
-            Join Meeting
+            {meeting.meeting_provider === "Google Meet"
+              ? "Join Google Meet"
+              : "Join Meeting"}
           </a>
         ) : (
           <div className="w-full bg-white/10 border border-white/20 text-white/60 text-sm font-medium rounded-xl py-2.5 text-center">
@@ -431,12 +433,16 @@ function AssignmentListItem({
       ? new Date(assignment.due_at) < new Date()
       : false;
 
+  const href = isTeacher
+    ? `/teacher/classes/${assignment.class_id}/assignments`
+    : `/homework/${assignment.id}`;
+
   return (
     <li className="bg-card-bg border border-soft-border rounded-xl p-4 flex items-center gap-3 shadow-card">
       <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
         <BookOpen size={15} className="text-primary" aria-hidden="true" />
       </div>
-      <div className="min-w-0 flex-1">
+      <Link href={href} className="min-w-0 flex-1 hover:opacity-80 transition-opacity">
         <p className="text-sm font-medium text-dark-text truncate">
           {assignment.title}
         </p>
@@ -444,7 +450,7 @@ function AssignmentListItem({
           {assignment.classes?.name ?? "Unknown Class"} ·{" "}
           {formatDueDate(assignment.due_at)}
         </p>
-      </div>
+      </Link>
       {isTeacher ? (
         <span
           className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${

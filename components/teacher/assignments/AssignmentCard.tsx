@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { BookOpen, Pencil, X } from "lucide-react";
+import Link from "next/link";
+import { BookOpen, Pencil, X, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import DeleteAssignmentButton from "./DeleteAssignmentButton";
 
@@ -30,7 +31,13 @@ const formatDate = (iso: string) =>
     year: "numeric",
   });
 
-export default function AssignmentCard({ assignment }: { assignment: Assignment }) {
+export default function AssignmentCard({
+  assignment,
+  classId,
+}: {
+  assignment: Assignment;
+  classId: string;
+}) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(assignment.title);
@@ -120,12 +127,23 @@ export default function AssignmentCard({ assignment }: { assignment: Assignment 
         </button>
       </div>
 
-      {/* Instructions (display mode) */}
-      {!editing && assignment.instructions && (
+      {/* Instructions + submissions link (display mode) */}
+      {!editing && (
         <div className="px-5 pb-4 border-t border-soft-border">
-          <p className="text-sm text-muted-text mt-3 line-clamp-2">
-            {assignment.instructions}
-          </p>
+          {assignment.instructions && (
+            <p className="text-sm text-muted-text mt-3 mb-3 line-clamp-2">
+              {assignment.instructions}
+            </p>
+          )}
+          <div className={assignment.instructions ? "" : "mt-3"}>
+            <Link
+              href={`/teacher/classes/${classId}/assignments/${assignment.id}/submissions`}
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary-dark px-3 py-1.5 rounded-lg hover:bg-blue-50 transition-colors border border-blue-100"
+            >
+              <Users size={12} aria-hidden="true" />
+              View Submissions
+            </Link>
+          </div>
         </div>
       )}
 

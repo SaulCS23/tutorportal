@@ -139,14 +139,22 @@ export default function HomeworkList({ assignments, isTeacher }: HomeworkListPro
               ? `/teacher/classes/${a.class_id}/assignments`
               : `/classes/${a.class_id}`;
 
+            const actionHref = isTeacher
+              ? classHref
+              : `/homework/${a.id}`;
+            const actionLabel = isTeacher ? "Manage" : "Open Assignment";
+
             return (
               <li key={a.id}>
                 <article className="bg-card-bg border border-soft-border rounded-2xl shadow-card p-5 flex flex-col gap-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <h3 className="font-semibold text-dark-text text-sm leading-snug">
+                      <Link
+                        href={actionHref}
+                        className="font-semibold text-dark-text text-sm leading-snug hover:text-primary transition-colors"
+                      >
                         {a.title}
-                      </h3>
+                      </Link>
                       <Link
                         href={classHref}
                         className="text-xs text-primary hover:underline mt-0.5 inline-block"
@@ -176,11 +184,11 @@ export default function HomeworkList({ assignments, isTeacher }: HomeworkListPro
                       )}
                     </div>
                     <Link
-                      href={classHref}
+                      href={actionHref}
                       className="text-xs font-medium text-primary hover:text-primary-dark px-3 py-1.5 rounded-lg hover:bg-blue-50 transition-colors"
-                      aria-label={`Open class for: ${a.title}`}
+                      aria-label={`${actionLabel}: ${a.title}`}
                     >
-                      {isTeacher ? "Manage" : "View Class"}
+                      {actionLabel}
                     </Link>
                   </div>
                 </article>
