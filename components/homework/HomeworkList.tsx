@@ -1,90 +1,89 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import HomeworkCard from "@/components/cards/HomeworkCard";
-import { Search } from "lucide-react";
+import Link from "next/link";
+import { Search, BookOpen } from "lucide-react";
+import StatusBadge from "@/components/ui/StatusBadge";
 
-type Status = "all" | "not-started" | "in-progress" | "submitted";
+export type AssignmentItem = {
+  id: string;
+  title: string;
+  class_name: string;
+  instructions: string | null;
+  due_at: string | null;
+  points: number;
+  status: "draft" | "published";
+  class_id: string;
+};
 
-const assignments = [
-  {
-    id: 1,
-    title: "SAT Math Practice Set 4",
-    course: "SAT Math",
-    dueDate: "September 7",
-    status: "in-progress" as const,
-    preview:
-      "Complete problems 1–30 from the College Board practice set. Show all working for grid-in questions.",
-  },
-  {
-    id: 2,
-    title: "SAT Grammar Review",
-    course: "SAT Reading & Writing",
-    dueDate: "September 9",
-    status: "not-started" as const,
-    preview:
-      "Review transitions, punctuation, and sentence boundary rules. Focus on the passages provided in the shared folder.",
-  },
-  {
-    id: 3,
-    title: "AP Calculus Integration Practice",
-    course: "AP Calculus BC",
-    dueDate: "September 12",
-    status: "not-started" as const,
-    preview:
-      "Solve the 15 integration problems. Include u-substitution and integration by parts methods where applicable.",
-  },
-  {
-    id: 4,
-    title: "SAT Reading: Evidence Questions",
-    course: "SAT Reading & Writing",
-    dueDate: "September 14",
-    status: "not-started" as const,
-    preview:
-      "Read passages A and B and answer all command-of-evidence questions. Time yourself to stay within 13 minutes.",
-  },
-  {
-    id: 5,
-    title: "Algebra Word Problems Set",
-    course: "SAT Math",
-    dueDate: "September 3",
-    status: "submitted" as const,
-    preview:
-      "Completed 20 word problems covering rate, ratio, and proportion. Submitted via the shared folder.",
-  },
-  {
-    id: 6,
-    title: "AP Calculus Limits Review",
-    course: "AP Calculus BC",
-    dueDate: "August 28",
-    status: "submitted" as const,
-    preview:
-      "Reviewed limit definitions and solved 10 practice problems. All steps shown in the PDF submission.",
-  },
-];
+type FilterStatus = "all" | "upcoming" | "overdue" | "draft" | "published";
 
-const statusFilters: { value: Status; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "not-started", label: "Not Started" },
-  { value: "in-progress", label: "In Progress" },
-  { value: "submitted", label: "Submitted" },
-];
+interface HomeworkListProps {
+  assignments: AssignmentItem[];
+  isTeacher: boolean;
+}
 
-export default function HomeworkList() {
+function formatDueDate(iso: string | null): string {
+  if (!iso) return "No due date";
+  return new Date(iso).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function getDisplayStatus(
+  item: AssignmentItem,
+  isTeacher: boolean
+): "upcoming" | "overdue" | "draft" | "published" {
+  if (isTeacher) return item.status;
+  if (!item.due_at) return "upcoming";
+  return new Date(item.due_at) < new Date() ? "overdue" : "upcoming";
+}
+
+export default function HomeworkList({ assignments, isTeacher }: HomeworkListProps) {
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<Status>("all");
+
+  const filters: { value: FilterStatus; label: string }[] = isTeacher
+    ? [
+        { value: "all", label: "All" },
+        { value: "published", label: "Published" },
+        { value: "draft", label: "Draft" },
+      ]
+    : [
+        { value: "all", label: "All" },
+        { value: "upcoming", label: "Upcoming" },
+        { value: "overdue", label: "Overdue" },
+      ];
+
+  const [filter, setFilter] = useState<FilterStatus>("all");
 
   const filtered = useMemo(() => {
     return assignments.filter((a) => {
-      const matchesStatus = filter === "all" || a.status === filter;
       const q = search.toLowerCase();
       const matchesSearch =
         !q ||
         a.title.toLowerCase().includes(q) ||
-        a.course.toLowerCase().includes(q);
-      return matchesStatus && matchesSearch;
+        a.class_name.toLowerCase().includes(q);
+
+      if (!matchesSearch) return false;
+      if (filter === "all") return true;
+
+      const displayStatus = getDisplayStatus(a, isTeacher);
+      return displayStatus === filter;
     });
-  }, [search, filter]);
+  }, [assignments, search, filter, isTeacher]);
+
+  if (assignments.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
+          <BookOpen size={22} className="text-muted-text" aria-hidden="true" />
+        </div>
+        <p className="text-sm text-muted-text">No assignments yet.</p>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -105,12 +104,8 @@ export default function HomeworkList() {
           />
         </div>
 
-        <div
-          role="group"
-          aria-label="Filter by status"
-          className="flex gap-1.5 flex-wrap"
-        >
-          {statusFilters.map(({ value, label }) => (
+        <div role="group" aria-label="Filter by status" className="flex gap-1.5 flex-wrap">
+          {filters.map(({ value, label }) => (
             <button
               key={value}
               type="button"
@@ -134,21 +129,64 @@ export default function HomeworkList() {
         </p>
       ) : (
         <ul
-          className="grid gap-4 sm:grid-cols-2"
+          className="flex flex-col gap-4"
           role="list"
           aria-label="Assignments"
         >
-          {filtered.map((a) => (
-            <li key={a.id}>
-              <HomeworkCard
-                title={a.title}
-                course={a.course}
-                dueDate={a.dueDate}
-                status={a.status}
-                preview={a.preview}
-              />
-            </li>
-          ))}
+          {filtered.map((a) => {
+            const displayStatus = getDisplayStatus(a, isTeacher);
+            const classHref = isTeacher
+              ? `/teacher/classes/${a.class_id}/assignments`
+              : `/classes/${a.class_id}`;
+
+            return (
+              <li key={a.id}>
+                <article className="bg-card-bg border border-soft-border rounded-2xl shadow-card p-5 flex flex-col gap-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h3 className="font-semibold text-dark-text text-sm leading-snug">
+                        {a.title}
+                      </h3>
+                      <Link
+                        href={classHref}
+                        className="text-xs text-primary hover:underline mt-0.5 inline-block"
+                      >
+                        {a.class_name}
+                      </Link>
+                    </div>
+                    <StatusBadge status={displayStatus} />
+                  </div>
+
+                  {a.instructions && (
+                    <p className="text-sm text-muted-text leading-relaxed line-clamp-2">
+                      {a.instructions}
+                    </p>
+                  )}
+
+                  <div className="flex items-center justify-between pt-1 border-t border-soft-border">
+                    <div className="text-xs text-muted-text">
+                      Due{" "}
+                      <span className="font-medium text-dark-text">
+                        {formatDueDate(a.due_at)}
+                      </span>
+                      {a.points > 0 && (
+                        <span className="ml-2 text-muted-text">
+                          · {a.points} pts
+                        </span>
+                      )}
+                    </div>
+                    <Link
+                      href={classHref}
+                      className="text-xs font-medium text-primary hover:text-primary-dark px-3 py-1.5 rounded-lg hover:bg-blue-50 transition-colors"
+                      aria-label={`Open class for: ${a.title}`}
+                    >
+                      {isTeacher ? "Manage" : "View Class"}
+                    </Link>
+                  </div>
+                </article>
+              </li>
+            );
+          })}
         </ul>
       )}
     </>

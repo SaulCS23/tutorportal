@@ -3,7 +3,10 @@ type Status =
   | "in-progress"
   | "submitted"
   | "upcoming"
-  | "completed";
+  | "completed"
+  | "overdue"
+  | "draft"
+  | "published";
 
 const config: Record<Status, { label: string; className: string }> = {
   "not-started": {
@@ -24,6 +27,18 @@ const config: Record<Status, { label: string; className: string }> = {
   },
   completed: {
     label: "Completed",
+    className: "bg-green-50 text-green-700 ring-1 ring-green-200",
+  },
+  overdue: {
+    label: "Overdue",
+    className: "bg-red-50 text-red-700 ring-1 ring-red-200",
+  },
+  draft: {
+    label: "Draft",
+    className: "bg-slate-100 text-slate-500",
+  },
+  published: {
+    label: "Published",
     className: "bg-green-50 text-green-700 ring-1 ring-green-200",
   },
 };

@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChevronLeft, Users } from "lucide-react";
+import { ChevronLeft, Users, BookOpen, Megaphone, Clock, Link as LinkIcon } from "lucide-react";
 import { getCurrentProfile } from "@/lib/supabase/helpers";
-import { getInitials } from "@/lib/utils";
+import { getInitials, DAY_NAMES, formatTime, isSafeUrl } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/server";
 import TopBar from "@/components/nav/TopBar";
 import CopyCodeButton from "@/components/classes/CopyCodeButton";
+import CopyButton from "@/components/ui/CopyButton";
 import EditClassForm from "@/components/classes/EditClassForm";
 import RemoveStudentButton from "@/components/classes/RemoveStudentButton";
 import DeleteClassButton from "@/components/classes/DeleteClassButton";
@@ -31,6 +32,49 @@ type StudentRow = {
   email: string;
   joined_at: string;
 };
+
+type ScheduleRow = {
+  id: string;
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+  timezone: string;
+  meeting_provider: string | null;
+  meeting_link: string | null;
+  meeting_id: string | null;
+  meeting_passcode: string | null;
+  location: string | null;
+};
+
+type AssignmentRow = {
+  id: string;
+  title: string;
+  instructions: string | null;
+  due_at: string | null;
+  points: number;
+  status: "draft" | "published";
+};
+
+type AnnouncementRow = {
+  id: string;
+  title: string;
+  body: string;
+  created_at: string;
+};
+
+const formatDate = (iso: string) =>
+  new Date(iso).toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+
+const formatShortDate = (iso: string) =>
+  new Date(iso).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
 
 export default async function ClassDetailPage({ params }: Props) {
   const { id } = await params;
@@ -66,28 +110,51 @@ export default async function ClassDetailPage({ params }: Props) {
   ]);
 
   const teacherName =
-    (teacherResult.data as { full_name: string } | null)?.full_name ??
-    "Unknown";
+    (teacherResult.data as { full_name: string } | null)?.full_name ?? "Unknown";
   const memberCount = countResult.count ?? 0;
 
-  let students: StudentRow[] = [];
-  if (isOwner) {
-    const { data } = await supabase.rpc("get_class_students", {
-      p_class_id: id,
-    });
-    students = (data as StudentRow[]) ?? [];
-  }
+  // Parallel: students (teacher only), schedule, assignments, announcements
+  const [studentsResult, schedulesResult, assignmentsResult, announcementsResult] =
+    await Promise.all([
+      isOwner
+        ? supabase.rpc("get_class_students", { p_class_id: id })
+        : Promise.resolve({ data: [] }),
+      supabase
+        .from("class_schedules")
+        .select(
+          "id, day_of_week, start_time, end_time, timezone, meeting_provider, meeting_link, meeting_id, meeting_passcode, location"
+        )
+        .eq("class_id", id)
+        .order("day_of_week")
+        .order("start_time"),
+      supabase
+        .from("assignments")
+        .select("id, title, instructions, due_at, points, status")
+        .eq("class_id", id)
+        .order("due_at", { ascending: true, nullsFirst: false }),
+      supabase
+        .from("announcements")
+        .select("id, title, body, created_at")
+        .eq("class_id", id)
+        .order("created_at", { ascending: false }),
+    ]);
 
-  const formatDate = (iso: string) =>
-    new Date(iso).toLocaleDateString("en-US", {
-      month: "long",
-      day: "numeric",
-      year: "numeric",
-    });
+  const students = (studentsResult.data as StudentRow[]) ?? [];
+  const schedules = (schedulesResult.data as ScheduleRow[]) ?? [];
+  const allAssignments = (assignmentsResult.data as AssignmentRow[]) ?? [];
+  const announcements = (announcementsResult.data as AnnouncementRow[]) ?? [];
+
+  // Students only see published assignments
+  const visibleAssignments = isOwner
+    ? allAssignments
+    : allAssignments.filter((a) => a.status === "published");
 
   return (
     <div>
-      <TopBar title={typedCls.name} initials={getInitials(profile?.first_name, profile?.last_name)} />
+      <TopBar
+        title={typedCls.name}
+        initials={getInitials(profile?.first_name, profile?.last_name)}
+      />
 
       <div className="mb-5">
         <Link
@@ -158,6 +225,192 @@ export default async function ClassDetailPage({ params }: Props) {
               </span>
               <CopyCodeButton code={typedCls.join_code} />
             </div>
+          </section>
+        )}
+
+        {/* Weekly Schedule */}
+        {schedules.length > 0 && (
+          <section aria-labelledby="schedule-heading">
+            <h2
+              id="schedule-heading"
+              className="text-sm font-semibold text-muted-text uppercase tracking-wide mb-3"
+            >
+              Weekly Schedule
+            </h2>
+            <ul className="flex flex-col gap-3" role="list">
+              {schedules.map((s) => {
+                const safeLink = isSafeUrl(s.meeting_link) ? s.meeting_link! : null;
+                return (
+                  <li
+                    key={s.id}
+                    className="bg-card-bg border border-soft-border rounded-2xl shadow-card overflow-hidden"
+                  >
+                    <div className="flex items-start gap-3 px-5 py-4">
+                      <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0 mt-0.5">
+                        <Clock size={14} className="text-primary" aria-hidden="true" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold text-dark-text">
+                          {DAY_NAMES[s.day_of_week]}
+                        </p>
+                        <p className="text-xs text-muted-text mt-0.5">
+                          {formatTime(s.start_time)} – {formatTime(s.end_time)}{" "}
+                          <span className="text-slate-400">({s.timezone})</span>
+                        </p>
+                        {s.meeting_provider && (
+                          <p className="text-xs text-muted-text">{s.meeting_provider}</p>
+                        )}
+                      </div>
+                    </div>
+                    {(s.location || s.meeting_id || s.meeting_passcode || safeLink) && (
+                      <div className="border-t border-soft-border px-5 py-3 flex flex-col gap-2">
+                        {s.location && (
+                          <p className="text-xs text-muted-text">
+                            <span className="font-medium text-dark-text">Location:</span>{" "}
+                            {s.location}
+                          </p>
+                        )}
+                        {s.meeting_id && (
+                          <div className="flex items-center gap-2">
+                            <p className="text-xs text-muted-text">
+                              <span className="font-medium text-dark-text">Meeting ID:</span>{" "}
+                              {s.meeting_id}
+                            </p>
+                            <CopyButton text={s.meeting_id} label="meeting ID" />
+                          </div>
+                        )}
+                        {s.meeting_passcode && (
+                          <div className="flex items-center gap-2">
+                            <p className="text-xs text-muted-text">
+                              <span className="font-medium text-dark-text">Passcode:</span>{" "}
+                              {s.meeting_passcode}
+                            </p>
+                            <CopyButton text={s.meeting_passcode} label="passcode" />
+                          </div>
+                        )}
+                        {safeLink && (
+                          <a
+                            href={safeLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:text-primary-dark transition-colors mt-1"
+                          >
+                            <LinkIcon size={14} aria-hidden="true" />
+                            Join Meeting
+                          </a>
+                        )}
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        )}
+
+        {/* Announcements */}
+        {announcements.length > 0 && (
+          <section aria-labelledby="announcements-list-heading">
+            <h2
+              id="announcements-list-heading"
+              className="text-sm font-semibold text-muted-text uppercase tracking-wide mb-3"
+            >
+              Announcements
+            </h2>
+            <ul className="flex flex-col gap-3" role="list">
+              {announcements.map((a) => (
+                <li
+                  key={a.id}
+                  className="bg-amber-50 border border-amber-200 rounded-2xl p-5 shadow-card"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center shrink-0 mt-0.5">
+                      <Megaphone size={14} className="text-warning" aria-hidden="true" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-dark-text">{a.title}</p>
+                      <p className="text-xs text-amber-600 mt-0.5">
+                        {formatShortDate(a.created_at)}
+                      </p>
+                      <p className="text-sm text-amber-900 leading-relaxed mt-2 whitespace-pre-line">
+                        {a.body}
+                      </p>
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {/* Assignments */}
+        {visibleAssignments.length > 0 && (
+          <section aria-labelledby="assignments-list-heading">
+            <h2
+              id="assignments-list-heading"
+              className="text-sm font-semibold text-muted-text uppercase tracking-wide mb-3"
+            >
+              Assignments
+            </h2>
+            <ul className="flex flex-col gap-3" role="list">
+              {visibleAssignments.map((a) => {
+                const overdue =
+                  a.due_at && new Date(a.due_at) < new Date();
+                return (
+                  <li
+                    key={a.id}
+                    className="bg-card-bg border border-soft-border rounded-2xl shadow-card p-5"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-3 min-w-0">
+                        <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0 mt-0.5">
+                          <BookOpen size={14} className="text-primary" aria-hidden="true" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-dark-text">
+                            {a.title}
+                          </p>
+                          {a.instructions && (
+                            <p className="text-xs text-muted-text mt-0.5 line-clamp-2">
+                              {a.instructions}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      {isOwner ? (
+                        <span
+                          className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${
+                            a.status === "published"
+                              ? "bg-green-100 text-green-700"
+                              : "bg-slate-100 text-slate-500"
+                          }`}
+                        >
+                          {a.status === "published" ? "Published" : "Draft"}
+                        </span>
+                      ) : overdue ? (
+                        <span className="text-xs font-medium bg-red-50 text-red-700 ring-1 ring-red-200 px-2.5 py-0.5 rounded-full shrink-0">
+                          Overdue
+                        </span>
+                      ) : (
+                        <span className="text-xs font-medium bg-blue-50 text-blue-700 ring-1 ring-blue-200 px-2.5 py-0.5 rounded-full shrink-0">
+                          Upcoming
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3 mt-3 pt-3 border-t border-soft-border text-xs text-muted-text">
+                      <span>
+                        Due:{" "}
+                        <span className="font-medium text-dark-text">
+                          {a.due_at ? formatShortDate(a.due_at) : "No due date"}
+                        </span>
+                      </span>
+                      <span aria-hidden="true">·</span>
+                      <span>{a.points} pts</span>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
           </section>
         )}
 

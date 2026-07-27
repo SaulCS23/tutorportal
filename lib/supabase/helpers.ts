@@ -2,6 +2,30 @@ import { unstable_noStore as noStore } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
+export type ClassSchedule = {
+  id: string;
+  class_id: string;
+  day_of_week: number;
+  start_time: string; // "HH:MM:SS" from PostgreSQL time type
+  end_time: string;
+  timezone: string;
+  meeting_provider: string | null;
+  meeting_link: string | null;
+  meeting_id: string | null;
+  meeting_passcode: string | null;
+  location: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ClassScheduleWithClass = ClassSchedule & {
+  classes: { name: string; subject: string | null } | null;
+};
+
+export type ClassScheduleWithTeacher = ClassScheduleWithClass & {
+  classes: { name: string; subject: string | null; teacher_id: string } | null;
+};
+
 export type Class = {
   id: string;
   name: string;
