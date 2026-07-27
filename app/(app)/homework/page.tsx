@@ -11,7 +11,7 @@ export default async function HomeworkPage() {
 
   return (
     <div>
-      <TopBar title="Homework" initials={getInitials(profile?.full_name)} />
+      <TopBar title="Homework" initials={getInitials(profile?.first_name, profile?.last_name)} />
 
       <div className="mb-6">
         <p className="text-muted-text text-sm">

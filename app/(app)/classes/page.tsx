@@ -73,7 +73,7 @@ export default async function ClassesPage() {
 
   return (
     <div>
-      <TopBar title="My Classes" initials={getInitials(profile?.full_name)} />
+      <TopBar title="My Classes" initials={getInitials(profile?.first_name, profile?.last_name)} />
 
       {isTeacher ? (
         <>

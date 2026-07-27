@@ -87,7 +87,7 @@ export default async function ClassDetailPage({ params }: Props) {
 
   return (
     <div>
-      <TopBar title={typedCls.name} initials={getInitials(profile?.full_name)} />
+      <TopBar title={typedCls.name} initials={getInitials(profile?.first_name, profile?.last_name)} />
 
       <div className="mb-5">
         <Link

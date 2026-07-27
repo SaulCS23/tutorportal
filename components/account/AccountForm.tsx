@@ -2,11 +2,20 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { updateFullNameAction } from "@/app/actions/profile";
+import { updateNameAction } from "@/app/actions/profile";
 
-export default function AccountForm({ currentFullName }: { currentFullName: string }) {
+interface AccountFormProps {
+  currentFirstName: string;
+  currentLastName: string;
+}
+
+export default function AccountForm({
+  currentFirstName,
+  currentLastName,
+}: AccountFormProps) {
   const router = useRouter();
-  const [fullName, setFullName] = useState(currentFullName);
+  const [firstName, setFirstName] = useState(currentFirstName);
+  const [lastName, setLastName] = useState(currentLastName);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -16,18 +25,22 @@ export default function AccountForm({ currentFullName }: { currentFullName: stri
     setError("");
     setSuccess(false);
 
-    if (!fullName.trim()) {
-      setError("Name cannot be blank.");
+    if (!firstName.trim()) {
+      setError("First name cannot be blank.");
       return;
     }
 
-    if (fullName.trim() === currentFullName) {
+    const unchanged =
+      firstName.trim() === currentFirstName &&
+      lastName.trim() === currentLastName;
+
+    if (unchanged) {
       setError("No changes to save.");
       return;
     }
 
     setLoading(true);
-    const result = await updateFullNameAction(fullName.trim());
+    const result = await updateNameAction(firstName.trim(), lastName.trim());
 
     if (result.error) {
       setError(result.error);
@@ -43,17 +56,40 @@ export default function AccountForm({ currentFullName }: { currentFullName: stri
   return (
     <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="fullName" className="text-sm font-medium text-dark-text">
-          Full Name
+        <label
+          htmlFor="firstName"
+          className="text-sm font-medium text-dark-text"
+        >
+          First Name
         </label>
         <input
-          id="fullName"
+          id="firstName"
           type="text"
-          autoComplete="name"
+          autoComplete="given-name"
           required
-          value={fullName}
+          value={firstName}
           onChange={(e) => {
-            setFullName(e.target.value);
+            setFirstName(e.target.value);
+            setSuccess(false);
+          }}
+          className="w-full px-3.5 py-2.5 text-sm bg-page-bg border border-soft-border rounded-xl text-dark-text placeholder:text-muted-text focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition"
+        />
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <label
+          htmlFor="lastName"
+          className="text-sm font-medium text-dark-text"
+        >
+          Last Name
+        </label>
+        <input
+          id="lastName"
+          type="text"
+          autoComplete="family-name"
+          value={lastName}
+          onChange={(e) => {
+            setLastName(e.target.value);
             setSuccess(false);
           }}
           className="w-full px-3.5 py-2.5 text-sm bg-page-bg border border-soft-border rounded-xl text-dark-text placeholder:text-muted-text focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition"

@@ -43,9 +43,9 @@ const weeklySchedule = [
 
 export default async function DashboardPage() {
   const profile = await getCurrentProfile();
-  const firstName = profile?.full_name?.split(" ")[0] ?? "Student";
+  const firstName = profile?.first_name ?? "Student";
   const accountType = profile?.role === "teacher" ? "Teacher" : "Student";
-  const initials = getInitials(profile?.full_name);
+  const initials = getInitials(profile?.first_name, profile?.last_name);
 
   return (
     <div>

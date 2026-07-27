@@ -8,10 +8,12 @@ import AccountForm from "@/components/account/AccountForm";
 export const metadata: Metadata = { title: "Account" };
 
 export default async function AccountPage() {
-  const [user, profile] = await Promise.all([getCurrentUser(), getCurrentProfile()]);
+  const [user, profile] = await Promise.all([
+    getCurrentUser(),
+    getCurrentProfile(),
+  ]);
 
   if (!user) redirect("/login");
-  // profile may be null for accounts whose profiles row was not yet created
 
   const roleLabel = profile?.role === "teacher" ? "Teacher" : "Student";
   const memberSince = profile
@@ -23,12 +25,18 @@ export default async function AccountPage() {
 
   return (
     <div>
-      <TopBar title="Account" initials={getInitials(profile?.full_name)} />
+      <TopBar
+        title="Account"
+        initials={getInitials(profile?.first_name, profile?.last_name)}
+      />
 
       <div className="max-w-lg flex flex-col gap-6">
         {/* Account info */}
         <section aria-labelledby="account-info-heading">
-          <h2 id="account-info-heading" className="text-sm font-semibold text-muted-text uppercase tracking-wide mb-3">
+          <h2
+            id="account-info-heading"
+            className="text-sm font-semibold text-muted-text uppercase tracking-wide mb-3"
+          >
             Account Info
           </h2>
           <div className="bg-card-bg border border-soft-border rounded-2xl shadow-card divide-y divide-soft-border">
@@ -48,13 +56,19 @@ export default async function AccountPage() {
           </div>
         </section>
 
-        {/* Update name — always shown so users without a profile row can set their name */}
+        {/* Update name */}
         <section aria-labelledby="update-name-heading">
-          <h2 id="update-name-heading" className="text-sm font-semibold text-muted-text uppercase tracking-wide mb-3">
+          <h2
+            id="update-name-heading"
+            className="text-sm font-semibold text-muted-text uppercase tracking-wide mb-3"
+          >
             Update Name
           </h2>
           <div className="bg-card-bg border border-soft-border rounded-2xl shadow-card p-6">
-            <AccountForm currentFullName={profile?.full_name ?? ""} />
+            <AccountForm
+              currentFirstName={profile?.first_name ?? ""}
+              currentLastName={profile?.last_name ?? ""}
+            />
           </div>
         </section>
       </div>

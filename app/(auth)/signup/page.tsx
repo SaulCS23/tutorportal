@@ -5,7 +5,8 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 
 export default function SignUpPage() {
-  const [fullName, setFullName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -17,8 +18,12 @@ export default function SignUpPage() {
     e.preventDefault();
     setError("");
 
-    if (!fullName.trim()) {
-      setError("Full name is required.");
+    if (!firstName.trim()) {
+      setError("First name is required.");
+      return;
+    }
+    if (!lastName.trim()) {
+      setError("Last name is required.");
       return;
     }
     if (password.length < 6) {
@@ -39,7 +44,9 @@ export default function SignUpPage() {
       options: {
         emailRedirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
         data: {
-          full_name: fullName.trim(),
+          first_name: firstName.trim(),
+          last_name: lastName.trim(),
+          full_name: `${firstName.trim()} ${lastName.trim()}`,
         },
       },
     });
@@ -94,20 +101,38 @@ export default function SignUpPage() {
       </div>
 
       <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="fullName" className="text-sm font-medium text-dark-text">
-            Full Name
-          </label>
-          <input
-            id="fullName"
-            type="text"
-            autoComplete="name"
-            required
-            value={fullName}
-            onChange={(e) => setFullName(e.target.value)}
-            placeholder="Jane Smith"
-            className="w-full px-3.5 py-2.5 text-sm bg-page-bg border border-soft-border rounded-xl text-dark-text placeholder:text-muted-text focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition"
-          />
+        <div className="grid grid-cols-2 gap-3">
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="firstName" className="text-sm font-medium text-dark-text">
+              First Name
+            </label>
+            <input
+              id="firstName"
+              type="text"
+              autoComplete="given-name"
+              required
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              placeholder="Jane"
+              className="w-full px-3.5 py-2.5 text-sm bg-page-bg border border-soft-border rounded-xl text-dark-text placeholder:text-muted-text focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="lastName" className="text-sm font-medium text-dark-text">
+              Last Name
+            </label>
+            <input
+              id="lastName"
+              type="text"
+              autoComplete="family-name"
+              required
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+              placeholder="Smith"
+              className="w-full px-3.5 py-2.5 text-sm bg-page-bg border border-soft-border rounded-xl text-dark-text placeholder:text-muted-text focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition"
+            />
+          </div>
         </div>
 
         <div className="flex flex-col gap-1.5">

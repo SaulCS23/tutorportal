@@ -58,7 +58,7 @@ export default async function SchedulePage() {
 
   return (
     <div>
-      <TopBar title="Schedule" initials={getInitials(profile?.full_name)} />
+      <TopBar title="Schedule" initials={getInitials(profile?.first_name, profile?.last_name)} />
 
       <div className="mb-8">
         <p className="text-muted-text text-sm">

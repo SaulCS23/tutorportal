@@ -19,6 +19,8 @@ export type ClassMember = {
 
 export type Profile = {
   id: string;
+  first_name: string | null;
+  last_name: string | null;
   full_name: string;
   role: "student" | "teacher";
   created_at: string;
@@ -38,14 +40,20 @@ export async function getCurrentProfile(): Promise<Profile | null> {
   const supabase = await createClient();
   const {
     data: { user },
+    error: authError,
   } = await supabase.auth.getUser();
-  if (!user) return null;
 
-  const { data } = await supabase
+  if (authError || !user) return null;
+
+  const { data, error } = await supabase
     .from("profiles")
-    .select("id, full_name, role, created_at, updated_at")
+    .select("id, first_name, last_name, full_name, role, created_at, updated_at")
     .eq("id", user.id)
     .single();
+
+  if (error) {
+    console.error("[getCurrentProfile] code=%s msg=%s", error.code, error.message);
+  }
 
   return (data as Profile) ?? null;
 }
