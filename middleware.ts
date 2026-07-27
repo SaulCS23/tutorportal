@@ -37,7 +37,8 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith("/homework") ||
     pathname.startsWith("/schedule") ||
     pathname.startsWith("/account") ||
-    pathname.startsWith("/classes");
+    pathname.startsWith("/classes") ||
+    pathname.startsWith("/teacher");
 
   const isAuthRoute =
     pathname === "/login" || pathname === "/signup";
@@ -64,6 +65,7 @@ export const config = {
     "/schedule/:path*",
     "/account/:path*",
     "/classes/:path*",
+    "/teacher/:path*",
     "/login",
     "/signup",
   ],

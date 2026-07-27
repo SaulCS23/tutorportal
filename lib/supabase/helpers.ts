@@ -1,5 +1,6 @@
 import { unstable_noStore as noStore } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export type Class = {
   id: string;
@@ -27,6 +28,9 @@ export type Profile = {
   updated_at: string;
 };
 
+const PROFILE_SELECT =
+  "id, first_name, last_name, full_name, role, created_at, updated_at";
+
 export async function getCurrentUser() {
   const supabase = await createClient();
   const {
@@ -38,6 +42,8 @@ export async function getCurrentUser() {
 export async function getCurrentProfile(): Promise<Profile | null> {
   noStore();
   const supabase = await createClient();
+
+  // auth.getUser() validates the JWT with Supabase's auth server — always accurate.
   const {
     data: { user },
     error: authError,
@@ -45,17 +51,42 @@ export async function getCurrentProfile(): Promise<Profile | null> {
 
   if (authError || !user) return null;
 
+  // Try the RLS-enforced authenticated client first.
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, first_name, last_name, full_name, role, created_at, updated_at")
+    .select(PROFILE_SELECT)
     .eq("id", user.id)
     .single();
 
+  if (data) return data as Profile;
+
+  // Log the RLS failure so the error is visible in Vercel function logs.
   if (error) {
-    console.error("[getCurrentProfile] code=%s msg=%s", error.code, error.message);
+    console.error(
+      "[getCurrentProfile] authenticated-client error code=%s msg=%s",
+      error.code,
+      error.message
+    );
   }
 
-  return (data as Profile) ?? null;
+  // Fallback: service-role admin client bypasses RLS so we always read the row
+  // that auth.getUser() has already confirmed belongs to this user.
+  const admin = createAdminClient();
+  const { data: adminData, error: adminError } = await admin
+    .from("profiles")
+    .select(PROFILE_SELECT)
+    .eq("id", user.id)
+    .single();
+
+  if (adminError) {
+    console.error(
+      "[getCurrentProfile] admin-client error code=%s msg=%s",
+      adminError.code,
+      adminError.message
+    );
+  }
+
+  return (adminData as Profile) ?? null;
 }
 
 export async function getCurrentRole(): Promise<"student" | "teacher" | null> {

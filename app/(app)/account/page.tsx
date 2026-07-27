@@ -15,6 +15,21 @@ export default async function AccountPage() {
 
   if (!user) redirect("/login");
 
+  // Resolve display values: profile row → auth user_metadata → empty string.
+  // This ensures the page always shows something even when the RLS query fails.
+  const meta = user.user_metadata as Record<string, string | undefined> ?? {};
+
+  const firstName: string =
+    profile?.first_name || meta.first_name || "";
+
+  const lastName: string =
+    profile?.last_name || meta.last_name || "";
+
+  const displayFullName =
+    [firstName, lastName].filter(Boolean).join(" ") ||
+    profile?.full_name ||
+    "—";
+
   const roleLabel = profile?.role === "teacher" ? "Teacher" : "Student";
   const memberSince = profile
     ? new Date(profile.created_at).toLocaleDateString("en-US", {
@@ -27,7 +42,7 @@ export default async function AccountPage() {
     <div>
       <TopBar
         title="Account"
-        initials={getInitials(profile?.first_name, profile?.last_name)}
+        initials={getInitials(firstName || null, lastName || null)}
       />
 
       <div className="max-w-lg flex flex-col gap-6">
@@ -42,7 +57,7 @@ export default async function AccountPage() {
           <div className="bg-card-bg border border-soft-border rounded-2xl shadow-card divide-y divide-soft-border">
             <dl>
               <Row label="Email" value={user.email ?? "—"} />
-              <Row label="Full Name" value={profile?.full_name ?? "—"} />
+              <Row label="Full Name" value={displayFullName} />
               <Row
                 label="Account Type"
                 value={
@@ -66,8 +81,8 @@ export default async function AccountPage() {
           </h2>
           <div className="bg-card-bg border border-soft-border rounded-2xl shadow-card p-6">
             <AccountForm
-              currentFirstName={profile?.first_name ?? ""}
-              currentLastName={profile?.last_name ?? ""}
+              currentFirstName={firstName}
+              currentLastName={lastName}
             />
           </div>
         </section>

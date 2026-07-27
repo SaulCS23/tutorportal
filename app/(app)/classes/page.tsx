@@ -86,7 +86,7 @@ export default async function ClassesPage() {
               {teacherClasses.map((cls) => (
                 <li key={cls.id}>
                   <Link
-                    href={`/classes/${cls.id}`}
+                    href={`/teacher/classes/${cls.id}`}
                     className="block bg-card-bg border border-soft-border rounded-2xl shadow-card p-5 hover:shadow-card-hover hover:border-primary/30 transition-all group"
                   >
                     <div className="flex items-start gap-3">
