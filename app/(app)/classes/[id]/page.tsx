@@ -12,6 +12,7 @@ import EditClassForm from "@/components/classes/EditClassForm";
 import RemoveStudentButton from "@/components/classes/RemoveStudentButton";
 import DeleteClassButton from "@/components/classes/DeleteClassButton";
 import LeaveClassButton from "@/components/classes/LeaveClassButton";
+import StatusBadge from "@/components/ui/StatusBadge";
 
 export const metadata: Metadata = { title: "Class" };
 
@@ -57,6 +58,20 @@ type AssignmentRow = {
   status: "draft" | "published";
 };
 
+type MeetingRow = {
+  id: string;
+  title: string;
+  description: string | null;
+  meeting_date: string;
+  start_time: string;
+  end_time: string;
+  timezone: string;
+  meeting_provider: string | null;
+  meeting_link: string | null;
+  location: string | null;
+  status: "scheduled" | "completed" | "cancelled";
+};
+
 type AnnouncementRow = {
   id: string;
   title: string;
@@ -73,6 +88,14 @@ const formatDate = (iso: string) =>
 
 const formatShortDate = (iso: string) =>
   new Date(iso).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+
+const formatMeetingDate = (dateStr: string) =>
+  new Date(`${dateStr}T00:00:00`).toLocaleDateString("en-US", {
+    weekday: "short",
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -117,9 +140,14 @@ export default async function ClassDetailPage({ params }: Props) {
     (teacherResult.data as { full_name: string } | null)?.full_name ?? "Unknown";
   const memberCount = countResult.count ?? 0;
 
-  // Parallel: students (teacher only), schedule, assignments, announcements
-  const [studentsResult, schedulesResult, assignmentsResult, announcementsResult] =
-    await Promise.all([
+  // Parallel: students (teacher only), schedule, meetings, assignments, announcements
+  const [
+    studentsResult,
+    schedulesResult,
+    meetingsResult,
+    assignmentsResult,
+    announcementsResult,
+  ] = await Promise.all([
       isOwner
         ? supabase.rpc("get_class_students", { p_class_id: id })
         : Promise.resolve({ data: [] }),
@@ -131,6 +159,14 @@ export default async function ClassDetailPage({ params }: Props) {
         .eq("class_id", id)
         .order("day_of_week")
         .order("start_time"),
+      supabase
+        .from("class_meetings")
+        .select(
+          "id, title, description, meeting_date, start_time, end_time, timezone, meeting_provider, meeting_link, location, status"
+        )
+        .eq("class_id", id)
+        .order("meeting_date", { ascending: true })
+        .order("start_time", { ascending: true }),
       supabase
         .from("assignments")
         .select("id, title, instructions, due_at, points, status")
@@ -145,8 +181,12 @@ export default async function ClassDetailPage({ params }: Props) {
 
   const students = (studentsResult.data as StudentRow[]) ?? [];
   const schedules = (schedulesResult.data as ScheduleRow[]) ?? [];
+  const allMeetings = (meetingsResult.data as MeetingRow[]) ?? [];
   const allAssignments = (assignmentsResult.data as AssignmentRow[]) ?? [];
   const announcements = (announcementsResult.data as AnnouncementRow[]) ?? [];
+
+  const todayISO = new Date().toISOString().slice(0, 10);
+  const upcomingMeetings = allMeetings.filter((m) => m.meeting_date >= todayISO);
 
   // Students only see published assignments
   const visibleAssignments = isOwner
@@ -243,6 +283,74 @@ export default async function ClassDetailPage({ params }: Props) {
               </span>
               <CopyCodeButton code={typedCls.join_code} />
             </div>
+          </section>
+        )}
+
+        {/* Upcoming Meetings */}
+        {upcomingMeetings.length > 0 && (
+          <section aria-labelledby="meetings-heading">
+            <h2
+              id="meetings-heading"
+              className="text-sm font-semibold text-muted-text uppercase tracking-wide mb-3"
+            >
+              Upcoming Meetings
+            </h2>
+            <ul className="flex flex-col gap-3" role="list">
+              {upcomingMeetings.map((m) => {
+                const safeLink = isSafeUrl(m.meeting_link) ? m.meeting_link! : null;
+                return (
+                  <li
+                    key={m.id}
+                    className="bg-card-bg border border-soft-border rounded-2xl shadow-card overflow-hidden"
+                  >
+                    <div className="flex items-start gap-3 px-5 py-4">
+                      <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0 mt-0.5">
+                        <Clock size={14} className="text-primary" aria-hidden="true" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-sm font-semibold text-dark-text">{m.title}</p>
+                          <StatusBadge status={m.status} />
+                        </div>
+                        <p className="text-xs text-muted-text mt-0.5">
+                          {formatMeetingDate(m.meeting_date)} · {formatTime(m.start_time)} – {formatTime(m.end_time)}{" "}
+                          <span className="text-slate-400">({m.timezone})</span>
+                        </p>
+                        {m.meeting_provider && (
+                          <p className="text-xs text-muted-text">{m.meeting_provider}</p>
+                        )}
+                      </div>
+                    </div>
+                    {(m.description || m.location || safeLink) && (
+                      <div className="border-t border-soft-border px-5 py-3 flex flex-col gap-2">
+                        {m.description && (
+                          <p className="text-xs text-muted-text">{m.description}</p>
+                        )}
+                        {m.location && (
+                          <p className="text-xs text-muted-text">
+                            <span className="font-medium text-dark-text">Location:</span>{" "}
+                            {m.location}
+                          </p>
+                        )}
+                        {safeLink && (
+                          <a
+                            href={safeLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:text-primary-dark transition-colors mt-1"
+                          >
+                            <LinkIcon size={14} aria-hidden="true" />
+                            {m.meeting_provider === "Google Meet"
+                              ? "Join Google Meet"
+                              : "Join Meeting"}
+                          </a>
+                        )}
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
           </section>
         )}
 

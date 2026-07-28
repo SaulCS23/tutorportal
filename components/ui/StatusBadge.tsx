@@ -10,7 +10,9 @@ type Status =
   | "graded"
   | "returned"
   | "late"
-  | "missing";
+  | "missing"
+  | "scheduled"
+  | "cancelled";
 
 const config: Record<Status, { label: string; className: string }> = {
   "not-started": {
@@ -60,6 +62,14 @@ const config: Record<Status, { label: string; className: string }> = {
   missing: {
     label: "Missing",
     className: "bg-red-50 text-red-600 ring-1 ring-red-200",
+  },
+  scheduled: {
+    label: "Scheduled",
+    className: "bg-blue-50 text-blue-700 ring-1 ring-blue-200",
+  },
+  cancelled: {
+    label: "Cancelled",
+    className: "bg-slate-100 text-slate-500",
   },
 };
 

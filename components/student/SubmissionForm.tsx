@@ -2,14 +2,26 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Send, FileText, CheckCircle, Lock } from "lucide-react";
+import { Send, FileText, CheckCircle, Lock, Upload, Download, Trash2, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import {
+  buildStoragePath,
+  uploadFile,
+  getSignedFileUrl,
+  deleteFile,
+  fileNameFromPath,
+} from "@/lib/supabase/storage";
+
+const SUBMISSION_FILES_BUCKET = "submission-files";
+const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20 MB — matches the bucket's file_size_limit
+const ALLOWED_MIME_TYPES = ["application/pdf", "image/png", "image/jpeg"];
 
 export type Submission = {
   id: string;
   assignment_id: string;
   student_id: string;
   answer_text: string | null;
+  attachment_url: string | null;
   status: "draft" | "submitted" | "graded" | "returned";
   submitted_at: string;
   updated_at: string;
@@ -61,19 +73,104 @@ export default function SubmissionForm({
   const [success, setSuccess] = useState("");
   const [confirmSubmit, setConfirmSubmit] = useState(false);
 
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [attachmentUrl, setAttachmentUrl] = useState(
+    existingSubmission?.attachment_url ?? null
+  );
+  const [fileError, setFileError] = useState("");
+  const [fileBusy, setFileBusy] = useState(false);
+
+  function validateFile(file: File): string | null {
+    if (!ALLOWED_MIME_TYPES.includes(file.type)) {
+      return "Only PDF, PNG, or JPEG files are supported.";
+    }
+    if (file.size > MAX_FILE_SIZE) return "File is too large. Maximum size is 20 MB.";
+    return null;
+  }
+
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setFileError("");
+    const validationError = validateFile(file);
+    if (validationError) {
+      setFileError(validationError);
+      return;
+    }
+    setPendingFile(file);
+  }
+
+  async function handleViewAttachment() {
+    if (!attachmentUrl) return;
+    setFileError("");
+    const supabase = createClient();
+    const { url, error: signError } = await getSignedFileUrl(
+      supabase,
+      SUBMISSION_FILES_BUCKET,
+      attachmentUrl
+    );
+    if (signError || !url) {
+      setFileError(signError ?? "Could not open file.");
+      return;
+    }
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+
+  async function handleRemoveAttachment() {
+    if (!existingSubmission || !attachmentUrl) return;
+    setFileError("");
+    setFileBusy(true);
+    const supabase = createClient();
+
+    const { error: dbError } = await supabase
+      .from("assignment_submissions")
+      .update({ attachment_url: null })
+      .eq("id", existingSubmission.id);
+
+    if (dbError) {
+      setFileError(dbError.message);
+      setFileBusy(false);
+      return;
+    }
+
+    await deleteFile(supabase, SUBMISSION_FILES_BUCKET, attachmentUrl);
+    setAttachmentUrl(null);
+    setFileBusy(false);
+    router.refresh();
+  }
+
   async function saveSubmission(status: "draft" | "submitted") {
     setError("");
     setSuccess("");
+    setFileError("");
     setLoading(true);
 
     const supabase = createClient();
 
     if (existingSubmission) {
+      let newAttachmentUrl: string | undefined;
+      if (pendingFile) {
+        const path = buildStoragePath(existingSubmission.id, pendingFile.name);
+        const { error: uploadError } = await uploadFile(
+          supabase,
+          SUBMISSION_FILES_BUCKET,
+          path,
+          pendingFile
+        );
+        if (uploadError) {
+          setFileError(uploadError);
+        } else {
+          newAttachmentUrl = path;
+        }
+      }
+
       const { error: dbError } = await supabase
         .from("assignment_submissions")
         .update({
           answer_text: answer.trim() || null,
           status,
+          ...(newAttachmentUrl ? { attachment_url: newAttachmentUrl } : {}),
         })
         .eq("id", existingSubmission.id);
 
@@ -82,19 +179,50 @@ export default function SubmissionForm({
         setLoading(false);
         return;
       }
+
+      if (newAttachmentUrl) {
+        setAttachmentUrl(newAttachmentUrl);
+        setPendingFile(null);
+      }
     } else {
-      const { error: dbError } = await supabase
+      const { data, error: dbError } = await supabase
         .from("assignment_submissions")
         .insert({
           assignment_id: assignmentId,
           answer_text: answer.trim() || null,
           status,
-        });
+        })
+        .select("id")
+        .single();
 
       if (dbError) {
         setError(dbError.message);
         setLoading(false);
         return;
+      }
+
+      if (pendingFile && data) {
+        const path = buildStoragePath(data.id, pendingFile.name);
+        const { error: uploadError } = await uploadFile(
+          supabase,
+          SUBMISSION_FILES_BUCKET,
+          path,
+          pendingFile
+        );
+        if (uploadError) {
+          setFileError(uploadError);
+        } else {
+          const { error: attachError } = await supabase
+            .from("assignment_submissions")
+            .update({ attachment_url: path })
+            .eq("id", data.id);
+          if (attachError) {
+            setFileError(attachError.message);
+          } else {
+            setAttachmentUrl(path);
+            setPendingFile(null);
+          }
+        }
       }
     }
 
@@ -181,6 +309,26 @@ export default function SubmissionForm({
             </div>
           </div>
         )}
+
+        {/* Read-only attachment */}
+        {attachmentUrl && (
+          <div>
+            <p className="text-xs font-medium text-muted-text mb-2">
+              Attached file
+            </p>
+            <button
+              type="button"
+              onClick={handleViewAttachment}
+              className="w-full flex items-center gap-2 bg-card-bg border border-soft-border rounded-xl px-4 py-3 text-left hover:border-primary/30 transition-colors"
+            >
+              <FileText size={14} className="text-primary shrink-0" aria-hidden="true" />
+              <span className="min-w-0 flex-1 text-sm font-medium text-dark-text truncate">
+                {fileNameFromPath(attachmentUrl)}
+              </span>
+              <Download size={14} className="text-muted-text shrink-0" aria-hidden="true" />
+            </button>
+          </div>
+        )}
       </div>
     );
   }
@@ -209,6 +357,25 @@ export default function SubmissionForm({
             <div className="bg-card-bg border border-soft-border rounded-xl px-4 py-3 text-sm text-dark-text whitespace-pre-line">
               {existingSubmission.answer_text}
             </div>
+          </div>
+        )}
+
+        {attachmentUrl && (
+          <div>
+            <p className="text-xs font-medium text-muted-text mb-2">
+              Attached file
+            </p>
+            <button
+              type="button"
+              onClick={handleViewAttachment}
+              className="w-full flex items-center gap-2 bg-card-bg border border-soft-border rounded-xl px-4 py-3 text-left hover:border-primary/30 transition-colors"
+            >
+              <FileText size={14} className="text-primary shrink-0" aria-hidden="true" />
+              <span className="min-w-0 flex-1 text-sm font-medium text-dark-text truncate">
+                {fileNameFromPath(attachmentUrl)}
+              </span>
+              <Download size={14} className="text-muted-text shrink-0" aria-hidden="true" />
+            </button>
           </div>
         )}
       </div>
@@ -274,12 +441,72 @@ export default function SubmissionForm({
         />
       </div>
 
-      {/* Attachment — not yet implemented */}
-      <div className="bg-slate-50 border border-dashed border-soft-border rounded-xl px-4 py-3 flex items-center gap-3 text-muted-text">
-        <FileText size={15} aria-hidden="true" />
-        <span className="text-xs">
-          File attachment — coming soon
-        </span>
+      {/* Attachment — optional file upload */}
+      <div className="flex flex-col gap-2">
+        <label className="text-sm font-medium text-dark-text">
+          Attachment{" "}
+          <span className="font-normal text-muted-text">(optional)</span>
+        </label>
+
+        {attachmentUrl && !pendingFile ? (
+          <div className="flex items-center gap-2 bg-slate-50 border border-soft-border rounded-xl px-3.5 py-2.5">
+            <FileText size={14} className="text-muted-text shrink-0" aria-hidden="true" />
+            <button
+              type="button"
+              onClick={handleViewAttachment}
+              className="min-w-0 flex-1 text-left text-sm font-medium text-dark-text hover:text-primary transition-colors truncate"
+            >
+              {fileNameFromPath(attachmentUrl)}
+            </button>
+            <Download size={13} className="text-muted-text shrink-0" aria-hidden="true" />
+            <button
+              type="button"
+              onClick={handleRemoveAttachment}
+              disabled={fileBusy}
+              aria-label="Remove attached file"
+              className="p-1 text-muted-text hover:text-red-600 rounded-md transition-colors disabled:opacity-60 shrink-0"
+            >
+              {fileBusy ? (
+                <Loader2 size={13} className="animate-spin" aria-hidden="true" />
+              ) : (
+                <Trash2 size={13} aria-hidden="true" />
+              )}
+            </button>
+          </div>
+        ) : pendingFile ? (
+          <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-xl px-3.5 py-2.5">
+            <FileText size={14} className="text-primary shrink-0" aria-hidden="true" />
+            <span className="min-w-0 flex-1 text-sm font-medium text-dark-text truncate">
+              {pendingFile.name}
+            </span>
+            <span className="text-xs text-muted-text shrink-0">Will upload on save</span>
+            <button
+              type="button"
+              onClick={() => setPendingFile(null)}
+              aria-label="Remove selected file"
+              className="p-1 text-muted-text hover:text-red-600 rounded-md transition-colors shrink-0"
+            >
+              <Trash2 size={13} aria-hidden="true" />
+            </button>
+          </div>
+        ) : (
+          <label className="inline-flex items-center gap-2 bg-slate-50 border border-dashed border-soft-border rounded-xl px-4 py-3 text-muted-text cursor-pointer hover:bg-slate-100 transition-colors w-fit">
+            <Upload size={14} aria-hidden="true" />
+            <span className="text-xs font-medium">Attach a file (PDF, PNG, or JPEG)</span>
+            <input
+              type="file"
+              accept="application/pdf,image/png,image/jpeg"
+              className="sr-only"
+              onChange={handleFileSelect}
+            />
+          </label>
+        )}
+
+        {fileError && (
+          <p role="alert" className="text-xs text-red-600">
+            {fileError}
+          </p>
+        )}
       </div>
 
       {error && (

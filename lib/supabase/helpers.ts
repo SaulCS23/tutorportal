@@ -26,6 +26,31 @@ export type ClassScheduleWithTeacher = ClassScheduleWithClass & {
   classes: { name: string; subject: string | null; teacher_id: string } | null;
 };
 
+export type ClassMeeting = {
+  id: string;
+  class_id: string;
+  title: string;
+  description: string | null;
+  meeting_date: string; // "YYYY-MM-DD" from PostgreSQL date type
+  start_time: string; // "HH:MM:SS" from PostgreSQL time type
+  end_time: string;
+  timezone: string;
+  meeting_provider: string | null;
+  meeting_link: string | null;
+  location: string | null;
+  status: "scheduled" | "completed" | "cancelled";
+  created_at: string;
+  updated_at: string;
+};
+
+export type ClassMeetingWithClass = ClassMeeting & {
+  classes: { name: string; subject: string | null } | null;
+};
+
+export type ClassMeetingWithTeacher = ClassMeetingWithClass & {
+  classes: { name: string; subject: string | null; teacher_id: string } | null;
+};
+
 export type Class = {
   id: string;
   name: string;

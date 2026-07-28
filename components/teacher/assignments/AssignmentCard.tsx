@@ -6,6 +6,7 @@ import Link from "next/link";
 import { BookOpen, Pencil, X, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import DeleteAssignmentButton from "./DeleteAssignmentButton";
+import AssignmentFileManager from "./AssignmentFileManager";
 
 export type Assignment = {
   id: string;
@@ -146,6 +147,9 @@ export default function AssignmentCard({
           </div>
         </div>
       )}
+
+      {/* Files (display mode) */}
+      {!editing && <AssignmentFileManager assignmentId={assignment.id} />}
 
       {/* Edit form */}
       {editing && (

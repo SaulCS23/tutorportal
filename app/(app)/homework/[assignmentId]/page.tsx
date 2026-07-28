@@ -8,6 +8,8 @@ import TopBar from "@/components/nav/TopBar";
 import StatusBadge from "@/components/ui/StatusBadge";
 import SubmissionForm from "@/components/student/SubmissionForm";
 import type { Submission } from "@/components/student/SubmissionForm";
+import AssignmentFileList from "@/components/student/AssignmentFileList";
+import type { AssignmentFile } from "@/components/student/AssignmentFileList";
 
 type Props = { params: Promise<{ assignmentId: string }> };
 
@@ -71,12 +73,21 @@ export default async function AssignmentDetailPage({ params }: Props) {
   const { data: rawSub } = await supabase
     .from("assignment_submissions")
     .select(
-      "id, assignment_id, student_id, answer_text, status, submitted_at, updated_at, score, max_score, teacher_feedback, graded_at"
+      "id, assignment_id, student_id, answer_text, attachment_url, status, submitted_at, updated_at, score, max_score, teacher_feedback, graded_at"
     )
     .eq("assignment_id", assignmentId)
     .maybeSingle();
 
   const submission = rawSub as Submission | null;
+
+  // Fetch assignment files — RLS ensures published + enrolled
+  const { data: rawFiles } = await supabase
+    .from("assignment_files")
+    .select("id, storage_path, file_name, file_size")
+    .eq("assignment_id", assignmentId)
+    .order("created_at", { ascending: true });
+
+  const files = (rawFiles as AssignmentFile[]) ?? [];
 
   const isPastDue = assignment.due_at
     ? new Date(assignment.due_at) < new Date()
@@ -169,6 +180,8 @@ export default async function AssignmentDetailPage({ params }: Props) {
             </p>
           </div>
         )}
+
+        <AssignmentFileList files={files} />
 
         {/* Submission form */}
         <div className="px-6 py-5">

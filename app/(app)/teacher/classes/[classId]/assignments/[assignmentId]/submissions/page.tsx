@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import StatusBadge from "@/components/ui/StatusBadge";
 import GradeSubmissionForm from "@/components/teacher/submissions/GradeSubmissionForm";
 import type { SubmissionForGrading } from "@/components/teacher/submissions/GradeSubmissionForm";
+import SubmissionAttachmentLink from "@/components/teacher/submissions/SubmissionAttachmentLink";
 
 type Props = {
   params: Promise<{ classId: string; assignmentId: string }>;
@@ -32,6 +33,7 @@ type RawSubmission = {
   assignment_id: string;
   student_id: string;
   answer_text: string | null;
+  attachment_url: string | null;
   status: "draft" | "submitted" | "graded" | "returned";
   submitted_at: string;
   updated_at: string;
@@ -90,7 +92,7 @@ export default async function SubmissionsPage({ params }: Props) {
   const { data: subsData } = await supabase
     .from("assignment_submissions")
     .select(
-      "id, assignment_id, student_id, answer_text, status, submitted_at, updated_at, score, max_score, teacher_feedback, graded_at, graded_by"
+      "id, assignment_id, student_id, answer_text, attachment_url, status, submitted_at, updated_at, score, max_score, teacher_feedback, graded_at, graded_by"
     )
     .eq("assignment_id", assignmentId)
     .order("submitted_at", { ascending: true });
@@ -228,6 +230,16 @@ export default async function SubmissionsPage({ params }: Props) {
                           <div className="bg-slate-50 border border-soft-border rounded-xl px-4 py-3 text-sm text-dark-text whitespace-pre-line max-h-40 overflow-y-auto">
                             {sub.answer_text}
                           </div>
+                        </div>
+                      )}
+
+                      {/* Attachment */}
+                      {sub.attachment_url && (
+                        <div>
+                          <p className="text-xs font-medium text-muted-text mb-1">
+                            Attached file
+                          </p>
+                          <SubmissionAttachmentLink path={sub.attachment_url} />
                         </div>
                       )}
 
