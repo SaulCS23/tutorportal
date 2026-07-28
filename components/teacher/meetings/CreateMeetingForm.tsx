@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarPlus } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import DatePicker from "@/components/ui/DatePicker";
 
 const PROVIDER_OPTIONS = [
   { value: "Google Meet", label: "Google Meet" },
@@ -160,13 +161,7 @@ export default function CreateMeetingForm({ classId }: { classId: string }) {
               Date{" "}
               <span className="text-red-500" aria-hidden="true">*</span>
             </label>
-            <input
-              type="date"
-              required
-              value={meetingDate}
-              onChange={(e) => setMeetingDate(e.target.value)}
-              className={inputCls}
-            />
+            <DatePicker value={meetingDate} onChange={setMeetingDate} />
           </div>
           <div className="flex flex-col gap-1.5">
             <label className="text-sm font-medium text-dark-text">Timezone</label>

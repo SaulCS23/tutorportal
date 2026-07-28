@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { formatTime, isSafeUrl } from "@/lib/utils";
 import type { ClassMeeting } from "@/lib/supabase/helpers";
 import StatusBadge from "@/components/ui/StatusBadge";
+import DatePicker from "@/components/ui/DatePicker";
 import CancelMeetingButton from "./CancelMeetingButton";
 
 const PROVIDER_OPTIONS = [
@@ -223,13 +224,7 @@ export default function MeetingCard({ meeting }: { meeting: ClassMeeting }) {
                 <label className="text-sm font-medium text-dark-text">
                   Date <span className="text-red-500" aria-hidden="true">*</span>
                 </label>
-                <input
-                  type="date"
-                  required
-                  value={meetingDate}
-                  onChange={(e) => setMeetingDate(e.target.value)}
-                  className={inputCls}
-                />
+                <DatePicker value={meetingDate} onChange={setMeetingDate} />
               </div>
               <div className="flex flex-col gap-1.5">
                 <label className="text-sm font-medium text-dark-text">Timezone</label>
