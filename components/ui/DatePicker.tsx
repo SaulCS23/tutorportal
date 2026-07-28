@@ -5,20 +5,7 @@ import { DayPicker } from "react-day-picker";
 import type { ChevronProps, DayButtonProps } from "react-day-picker";
 import * as Popover from "@radix-ui/react-popover";
 import { Calendar, ChevronLeft, ChevronRight } from "lucide-react";
-
-function parseLocalDate(value: string): Date | undefined {
-  if (!value) return undefined;
-  const [y, m, d] = value.split("-").map(Number);
-  if (!y || !m || !d) return undefined;
-  return new Date(y, m - 1, d);
-}
-
-function toISODate(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
+import { parseLocalISODate, toLocalISODate } from "@/lib/utils";
 
 function formatDisplay(date: Date): string {
   return date.toLocaleDateString("en-US", {
@@ -77,7 +64,7 @@ export default function DatePicker({
   onChange: (value: string) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const selected = parseLocalDate(value);
+  const selected = parseLocalISODate(value);
 
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
@@ -100,7 +87,7 @@ export default function DatePicker({
             selected={selected}
             onSelect={(date) => {
               if (date) {
-                onChange(toISODate(date));
+                onChange(toLocalISODate(date));
                 setOpen(false);
               }
             }}

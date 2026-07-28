@@ -108,3 +108,40 @@ export function findNextSchedule<T extends { day_of_week: number; start_time: st
     return best;
   });
 }
+
+/**
+ * Formats a Date using its *local* getters as "YYYY-MM-DD" — never
+ * `toISOString()`, which reads UTC and can report the wrong calendar date
+ * for part of the day depending on the runtime's timezone offset.
+ */
+export function toLocalISODate(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+/**
+ * Parses a "YYYY-MM-DD" string into a local Date at midnight (never via
+ * `new Date(string)`, which some browsers parse as UTC and can shift the
+ * displayed day by one depending on the local timezone offset).
+ */
+export function parseLocalISODate(value: string): Date | undefined {
+  if (!value) return undefined;
+  const [y, m, d] = value.split("-").map(Number);
+  if (!y || !m || !d) return undefined;
+  return new Date(y, m - 1, d);
+}
+
+/**
+ * Returns "today" as a "YYYY-MM-DD" string in the given timezone (default
+ * America/Panama, this app's default business timezone — there is no
+ * per-user timezone stored anywhere). Computed via `toLocaleString` in the
+ * target zone plus local getters, never `toISOString()`, so a server
+ * running in UTC still reports the correct calendar date for a
+ * Panama-based user during the ~5 hour UTC/Panama offset window.
+ */
+export function todayISODateInTimezone(tz: string = "America/Panama"): string {
+  const localNow = new Date(new Date().toLocaleString("en-US", { timeZone: tz }));
+  return toLocalISODate(localNow);
+}
