@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronLeft, Users, BookOpen, Megaphone, Clock, Link as LinkIcon } from "lucide-react";
 import { getCurrentProfile } from "@/lib/supabase/helpers";
-import { getInitials, DAY_NAMES, formatTime, isSafeUrl } from "@/lib/utils";
+import { getInitials, DAY_NAMES, formatTime, isSafeUrl, formatDueDate } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/server";
 import TopBar from "@/components/nav/TopBar";
 import CopyCodeButton from "@/components/classes/CopyCodeButton";
@@ -529,7 +529,7 @@ export default async function ClassDetailPage({ params }: Props) {
                       <span>
                         Due:{" "}
                         <span className="font-medium text-dark-text">
-                          {a.due_at ? formatShortDate(a.due_at) : "No due date"}
+                          {a.due_at ? formatDueDate(a.due_at) : "No due date"}
                         </span>
                       </span>
                       <span aria-hidden="true">·</span>

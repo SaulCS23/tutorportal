@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { BookOpen, Megaphone, ChevronRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { formatDueDate } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Class Overview" };
 
@@ -68,7 +69,7 @@ export default async function TeacherClassOverviewPage({ params }: Props) {
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium text-dark-text truncate">{a.title}</p>
                   <p className="text-xs text-muted-text">
-                    {a.due_at ? `Due ${formatDate(a.due_at)}` : "No due date"} · {a.points} pts
+                    {a.due_at ? `Due ${formatDueDate(a.due_at)}` : "No due date"} · {a.points} pts
                   </p>
                 </div>
                 <span

@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, BookOpen, Clock, Award } from "lucide-react";
 import { getCurrentProfile } from "@/lib/supabase/helpers";
-import { getInitials, isClassNameRedundant } from "@/lib/utils";
+import { getInitials, formatDueDateTime } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/server";
 import TopBar from "@/components/nav/TopBar";
 import StatusBadge from "@/components/ui/StatusBadge";
@@ -23,17 +23,6 @@ type RawAssignment = {
   class_id: string;
   classes: { name: string; teacher_id: string } | null;
 };
-
-function formatDateTime(iso: string) {
-  return new Date(iso).toLocaleString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
 
 export default async function AssignmentDetailPage({ params }: Props) {
   const { assignmentId } = await params;
@@ -135,10 +124,7 @@ export default async function AssignmentDetailPage({ params }: Props) {
             <StatusBadge status={getSubmissionBadge()} />
           </div>
           <p className="text-xs text-muted-text mt-1">
-            {assignment.classes?.name &&
-              !isClassNameRedundant(assignment.title, assignment.classes.name) && (
-                <>{assignment.classes.name} · </>
-              )}
+            {assignment.classes?.name ? `${assignment.classes.name} · ` : ""}
             {teacherName}
           </p>
         </div>
@@ -152,7 +138,7 @@ export default async function AssignmentDetailPage({ params }: Props) {
                 <>
                   Due{" "}
                   <span className={`font-medium ${isPastDue ? "text-red-600" : "text-dark-text"}`}>
-                    {formatDateTime(assignment.due_at)}
+                    {formatDueDateTime(assignment.due_at)}
                   </span>
                   {isPastDue && (
                     <span className="ml-1 text-red-500 font-medium">(Past due)</span>

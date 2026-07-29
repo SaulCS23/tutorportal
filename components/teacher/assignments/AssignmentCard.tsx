@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { BookOpen, Pencil, X, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { combineDateAndTime, splitDateAndTime } from "@/lib/utils";
+import { combineDateAndTime, splitDateAndTime, formatDueDate } from "@/lib/utils";
 import DatePicker from "@/components/ui/DatePicker";
 import DeleteAssignmentButton from "./DeleteAssignmentButton";
 import AssignmentFileManager from "./AssignmentFileManager";
@@ -20,13 +20,6 @@ export type Assignment = {
   created_at: string;
   updated_at: string;
 };
-
-const formatDate = (iso: string) =>
-  new Date(iso).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
 
 export default function AssignmentCard({
   assignment,
@@ -107,7 +100,7 @@ export default function AssignmentCard({
           </div>
           <p className="text-xs text-muted-text mt-0.5">
             {assignment.due_at
-              ? `Due ${formatDate(assignment.due_at)}`
+              ? `Due ${formatDueDate(assignment.due_at)}`
               : "No due date"}{" "}
             · {assignment.points} pts
           </p>

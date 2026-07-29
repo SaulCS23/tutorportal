@@ -25,43 +25,122 @@ export function getInitials(
 }
 
 /**
- * True when showing a class name next to an assignment/homework title
- * would be redundant — either they're the same (trimmed, case-insensitive),
- * or the title already contains the full class name as a substring (e.g.
- * title "SAT Math Practice Set 4" next to class "SAT Math").
+ * The app's single default business timezone. Assignment due dates have
+ * no per-row timezone column (unlike class_meetings/class_schedules) —
+ * every teacher-entered date/time is interpreted in this zone, and every
+ * display of a due date is formatted back into this same zone, so the
+ * two always agree regardless of the viewer's own browser timezone or
+ * the server's runtime timezone (Vercel runs in UTC).
  */
-export function isClassNameRedundant(title: string, className: string): boolean {
-  const t = title.trim().toLowerCase();
-  const c = className.trim().toLowerCase();
-  if (!c) return true;
-  return t === c || t.includes(c);
-}
+export const APP_TIMEZONE = "America/Panama";
 
 /**
- * Combines a "YYYY-MM-DD" date and an optional "HH:MM" time into an ISO
- * instant, using local Date construction — never string-parsing a
- * datetime-local value, whose native browser widget silently produces an
- * empty string if a user fills in the date but not the time portion.
- * Defaults to end-of-day (23:59) when a date is chosen but no time is
- * set, so a due date is never silently dropped just because the time
- * segment wasn't touched.
+ * Converts a "YYYY-MM-DD" date + "HH:MM" time, interpreted as wall-clock
+ * time in `timeZone`, into the real UTC instant it represents — the one
+ * function every assignment form must use to turn a teacher-entered due
+ * date into a stored `due_at`. Never mixes UTC and local getters: it
+ * treats the input purely as "this wall clock, in this named zone" and
+ * asks `Intl.DateTimeFormat` (which understands real IANA zone rules)
+ * what that resolves to, rather than assuming the runtime's own
+ * timezone the way `new Date(y, m, d, h, min)` would.
+ *
+ * Defaults the time to 23:59 when a date is chosen but no time is set,
+ * so a due date is never silently dropped just because the time segment
+ * wasn't touched (the original bug with a combined datetime-local input).
  */
-export function combineDateAndTime(dateStr: string, timeStr: string): string | null {
+export function combineDateAndTime(
+  dateStr: string,
+  timeStr: string,
+  timeZone: string = APP_TIMEZONE
+): string | null {
   if (!dateStr) return null;
   const [y, m, d] = dateStr.split("-").map(Number);
   const [h, min] = (timeStr || "23:59").split(":").map(Number);
   if (!y || !m || !d) return null;
-  return new Date(y, m - 1, d, h || 0, min || 0).toISOString();
+
+  // First guess: treat the wall-clock components as if they were UTC.
+  const utcGuess = Date.UTC(y, m - 1, d, h || 0, min || 0);
+
+  // Ask what that instant actually reads as in the target zone.
+  const parts = formatPartsInZone(new Date(utcGuess), timeZone);
+  const hourValue = Number(parts.hour) % 24; // hour12:false can format midnight as "24"
+  const asUtcOfFormatted = Date.UTC(
+    Number(parts.year),
+    Number(parts.month) - 1,
+    Number(parts.day),
+    hourValue,
+    Number(parts.minute),
+    Number(parts.second)
+  );
+
+  // The gap between "what we guessed" and "what that guess reads as in
+  // the zone" is exactly the zone's offset at this date — remove it once.
+  const offset = asUtcOfFormatted - utcGuess;
+  return new Date(utcGuess - offset).toISOString();
 }
 
-/** The inverse of combineDateAndTime, for pre-filling an edit form from a stored ISO instant. */
-export function splitDateAndTime(iso: string): { date: string; time: string } {
-  const d = new Date(iso);
-  const p = (n: number) => String(n).padStart(2, "0");
+function formatPartsInZone(date: Date, timeZone: string): Record<string, string> {
+  const dtf = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
+  const parts: Record<string, string> = {};
+  for (const part of dtf.formatToParts(date)) parts[part.type] = part.value;
+  return parts;
+}
+
+/**
+ * The inverse of combineDateAndTime, for pre-filling an edit form: splits
+ * a stored UTC instant back into the "YYYY-MM-DD" date and "HH:MM" time
+ * it represents in `timeZone`.
+ */
+export function splitDateAndTime(
+  iso: string,
+  timeZone: string = APP_TIMEZONE
+): { date: string; time: string } {
+  const parts = formatPartsInZone(new Date(iso), timeZone);
+  const hourValue = String(Number(parts.hour) % 24).padStart(2, "0");
   return {
-    date: `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`,
-    time: `${p(d.getHours())}:${p(d.getMinutes())}`,
+    date: `${parts.year}-${parts.month}-${parts.day}`,
+    time: `${hourValue}:${parts.minute}`,
   };
+}
+
+/**
+ * Formats a stored due_at instant for display — always in `timeZone`
+ * (default America/Panama). Every assignment interface (teacher card,
+ * student homework list, assignment detail, dashboard) uses this (or
+ * formatDueDateTime) instead of its own toLocaleString call, so a due
+ * date reads identically everywhere regardless of whether the code runs
+ * in the browser or on the server.
+ */
+export function formatDueDate(iso: string | null, timeZone: string = APP_TIMEZONE): string {
+  if (!iso) return "No due date";
+  return new Date(iso).toLocaleDateString("en-US", {
+    timeZone,
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+/** Same as formatDueDate but includes the time of day. */
+export function formatDueDateTime(iso: string | null, timeZone: string = APP_TIMEZONE): string {
+  if (!iso) return "No due date";
+  return new Date(iso).toLocaleString("en-US", {
+    timeZone,
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
 }
 
 // ── Schedule utilities ────────────────────────────────────────

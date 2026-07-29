@@ -16,7 +16,7 @@ import {
   formatTime,
   isSafeUrl,
   findNextSchedule,
-  isClassNameRedundant,
+  formatDueDate,
 } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/server";
 import TopBar from "@/components/nav/TopBar";
@@ -60,14 +60,6 @@ type AnnouncementRow = {
 };
 
 // ── Helpers ───────────────────────────────────────────────────
-
-function formatDueDate(iso: string | null): string {
-  if (!iso) return "No due date";
-  return new Date(iso).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-  });
-}
 
 function isOverdue(due_at: string | null) {
   if (!due_at) return false;
@@ -454,10 +446,6 @@ function AssignmentListItem({
           {assignment.title}
         </p>
         <p className="text-xs text-muted-text truncate">
-          {assignment.classes?.name &&
-            !isClassNameRedundant(assignment.title, assignment.classes.name) && (
-              <>{assignment.classes.name} · </>
-            )}
           {formatDueDate(assignment.due_at)}
         </p>
       </Link>

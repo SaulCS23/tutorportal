@@ -4,7 +4,7 @@ import { useState, useMemo } from "react";
 import Link from "next/link";
 import { Search, BookOpen } from "lucide-react";
 import StatusBadge from "@/components/ui/StatusBadge";
-import { isClassNameRedundant } from "@/lib/utils";
+import { formatDueDate } from "@/lib/utils";
 
 export type AssignmentItem = {
   id: string;
@@ -22,15 +22,6 @@ type FilterStatus = "all" | "upcoming" | "overdue" | "draft" | "published";
 interface HomeworkListProps {
   assignments: AssignmentItem[];
   isTeacher: boolean;
-}
-
-function formatDueDate(iso: string | null): string {
-  if (!iso) return "No due date";
-  return new Date(iso).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
 }
 
 function getDisplayStatus(
@@ -156,14 +147,6 @@ export default function HomeworkList({ assignments, isTeacher }: HomeworkListPro
                       >
                         {a.title}
                       </Link>
-                      {!isClassNameRedundant(a.title, a.class_name) && (
-                        <Link
-                          href={classHref}
-                          className="text-xs text-primary hover:underline mt-0.5 inline-block"
-                        >
-                          {a.class_name}
-                        </Link>
-                      )}
                     </div>
                     <StatusBadge status={displayStatus} />
                   </div>

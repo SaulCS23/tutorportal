@@ -6,6 +6,7 @@ import StatusBadge from "@/components/ui/StatusBadge";
 import GradeSubmissionForm from "@/components/teacher/submissions/GradeSubmissionForm";
 import type { SubmissionForGrading } from "@/components/teacher/submissions/GradeSubmissionForm";
 import SubmissionAttachmentLink from "@/components/teacher/submissions/SubmissionAttachmentLink";
+import { formatDueDateTime } from "@/lib/utils";
 
 type Props = {
   params: Promise<{ classId: string; assignmentId: string }>;
@@ -135,7 +136,7 @@ export default async function SubmissionsPage({ params }: Props) {
             </h2>
             <p className="text-xs text-muted-text mt-0.5">
               {assignment.due_at
-                ? `Due ${formatDateTime(assignment.due_at)}`
+                ? `Due ${formatDueDateTime(assignment.due_at)}`
                 : "No due date"}{" "}
               {assignment.points > 0 && `· ${assignment.points} pts`}
             </p>
