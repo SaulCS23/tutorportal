@@ -2,9 +2,11 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Search, BookOpen } from "lucide-react";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { formatDueDate } from "@/lib/utils";
+import { clickableCardProps, stopCardClick, CLICKABLE_CARD_CLASSES } from "@/lib/clickableCard";
 
 export type AssignmentItem = {
   id: string;
@@ -34,6 +36,7 @@ function getDisplayStatus(
 }
 
 export default function HomeworkList({ assignments, isTeacher }: HomeworkListProps) {
+  const router = useRouter();
   const [search, setSearch] = useState("");
 
   const filters: { value: FilterStatus; label: string }[] = isTeacher
@@ -138,11 +141,18 @@ export default function HomeworkList({ assignments, isTeacher }: HomeworkListPro
 
             return (
               <li key={a.id}>
-                <article className="bg-card-bg border border-soft-border rounded-2xl shadow-card p-5 flex flex-col gap-3">
+                <article
+                  {...clickableCardProps(
+                    () => router.push(actionHref),
+                    `${actionLabel}: ${a.title}`
+                  )}
+                  className={`bg-card-bg border border-soft-border rounded-2xl shadow-card p-5 flex flex-col gap-3 ${CLICKABLE_CARD_CLASSES}`}
+                >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <Link
                         href={actionHref}
+                        onClick={stopCardClick}
                         className="font-semibold text-dark-text text-sm leading-snug hover:text-primary transition-colors"
                       >
                         {a.title}
@@ -171,6 +181,7 @@ export default function HomeworkList({ assignments, isTeacher }: HomeworkListPro
                     </div>
                     <Link
                       href={actionHref}
+                      onClick={stopCardClick}
                       className="text-xs font-medium text-primary hover:text-primary-dark px-3 py-1.5 rounded-lg hover:bg-blue-50 transition-colors"
                       aria-label={`${actionLabel}: ${a.title}`}
                     >

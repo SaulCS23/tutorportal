@@ -9,6 +9,7 @@ import { combineDateAndTime, splitDateAndTime, formatDueDate } from "@/lib/utils
 import DatePicker from "@/components/ui/DatePicker";
 import DeleteAssignmentButton from "./DeleteAssignmentButton";
 import AssignmentFileManager from "./AssignmentFileManager";
+import { clickableCardProps, stopCardClick, CLICKABLE_CARD_CLASSES } from "@/lib/clickableCard";
 
 export type Assignment = {
   id: string;
@@ -83,8 +84,19 @@ export default function AssignmentCard({
     new Date(assignment.due_at) < new Date() &&
     assignment.status === "published";
 
+  const submissionsHref = `/teacher/classes/${classId}/assignments/${assignment.id}/submissions`;
+
+  const cardProps = editing
+    ? {}
+    : clickableCardProps(() => router.push(submissionsHref), `Manage assignment: ${assignment.title}`);
+
   return (
-    <div className="bg-card-bg border border-soft-border rounded-2xl shadow-card overflow-hidden">
+    <div
+      {...cardProps}
+      className={`bg-card-bg border border-soft-border rounded-2xl shadow-card overflow-hidden ${
+        editing ? "" : CLICKABLE_CARD_CLASSES
+      }`}
+    >
       {/* Header */}
       <div className="flex items-start gap-3 px-5 py-4">
         <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0 mt-0.5">
@@ -107,7 +119,14 @@ export default function AssignmentCard({
         </div>
         <button
           type="button"
-          onClick={() => (editing ? cancelEdit() : setEditing(true))}
+          onClick={(e) => {
+            stopCardClick(e);
+            if (editing) {
+              cancelEdit();
+            } else {
+              setEditing(true);
+            }
+          }}
           aria-label={editing ? "Cancel edit" : "Edit assignment"}
           className="p-1.5 text-muted-text hover:text-dark-text hover:bg-slate-100 rounded-lg transition-colors shrink-0"
         >
@@ -129,7 +148,8 @@ export default function AssignmentCard({
           )}
           <div className={assignment.instructions ? "" : "mt-3"}>
             <Link
-              href={`/teacher/classes/${classId}/assignments/${assignment.id}/submissions`}
+              href={submissionsHref}
+              onClick={stopCardClick}
               className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary-dark px-3 py-1.5 rounded-lg hover:bg-blue-50 transition-colors border border-blue-100"
             >
               <Users size={12} aria-hidden="true" />
@@ -140,7 +160,11 @@ export default function AssignmentCard({
       )}
 
       {/* Files (display mode) */}
-      {!editing && <AssignmentFileManager assignmentId={assignment.id} />}
+      {!editing && (
+        <div onClick={stopCardClick}>
+          <AssignmentFileManager assignmentId={assignment.id} />
+        </div>
+      )}
 
       {/* Edit form */}
       {editing && (

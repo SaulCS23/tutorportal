@@ -2,25 +2,17 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import {
   CalendarDays,
-  Clock,
   BookOpen,
   Megaphone,
   GraduationCap,
   Users,
-  Link as LinkIcon,
 } from "lucide-react";
 import { getCurrentProfile } from "@/lib/supabase/helpers";
-import {
-  getInitials,
-  DAY_NAMES,
-  formatTime,
-  isSafeUrl,
-  findNextSchedule,
-  formatDueDate,
-} from "@/lib/utils";
+import { getInitials, findNextSchedule, formatDueDate } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/server";
 import TopBar from "@/components/nav/TopBar";
 import SectionHeading from "@/components/ui/SectionHeading";
+import NextMeetingCard from "@/components/dashboard/NextMeetingCard";
 
 export const metadata: Metadata = { title: "Dashboard" };
 
@@ -343,83 +335,6 @@ function StatCard({
   return inner;
 }
 
-function NextMeetingCard({ meeting }: { meeting: ScheduleRow | null }) {
-  if (!meeting) {
-    return (
-      <section aria-labelledby="next-lesson-heading">
-        <SectionHeading title="Next Meeting" id="next-lesson-heading" />
-        <div className="bg-card-bg border border-soft-border rounded-2xl shadow-card p-6 text-center text-sm text-muted-text">
-          No upcoming meetings scheduled.
-        </div>
-      </section>
-    );
-  }
-
-  const safeLink = isSafeUrl(meeting.meeting_link) ? meeting.meeting_link! : null;
-
-  return (
-    <section aria-labelledby="next-lesson-heading">
-      <SectionHeading title="Next Meeting" id="next-lesson-heading" />
-      <div className="bg-primary rounded-2xl p-6 text-white shadow-card">
-        <div className="flex items-center gap-2 text-blue-100 text-xs font-medium mb-4">
-          <CalendarDays size={14} aria-hidden="true" />
-          <span>Upcoming</span>
-        </div>
-        <h3 className="text-xl font-bold mb-1">
-          {meeting.classes?.name ?? "Class"}
-        </h3>
-        {meeting.classes?.subject && (
-          <p className="text-blue-100 text-sm mb-3">{meeting.classes.subject}</p>
-        )}
-        <dl className="grid grid-cols-2 gap-y-2 text-sm mb-5">
-          <div className="flex items-center gap-2 col-span-2">
-            <CalendarDays size={13} className="text-blue-200" aria-hidden="true" />
-            <dt className="sr-only">Day</dt>
-            <dd>{DAY_NAMES[meeting.day_of_week]}</dd>
-          </div>
-          <div className="flex items-center gap-2">
-            <Clock size={13} className="text-blue-200" aria-hidden="true" />
-            <dt className="sr-only">Time</dt>
-            <dd>
-              {formatTime(meeting.start_time)} – {formatTime(meeting.end_time)}
-            </dd>
-          </div>
-          {meeting.meeting_provider && (
-            <div className="flex items-center gap-2">
-              <dt className="sr-only">Provider</dt>
-              <dd className="text-blue-100">{meeting.meeting_provider}</dd>
-            </div>
-          )}
-          {meeting.location && (
-            <div className="flex items-center gap-2 col-span-2">
-              <dt className="sr-only">Location</dt>
-              <dd className="text-blue-100">{meeting.location}</dd>
-            </div>
-          )}
-        </dl>
-
-        {safeLink ? (
-          <a
-            href={safeLink}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-full flex items-center justify-center gap-2 bg-white/20 border border-white/30 text-white text-sm font-medium rounded-xl py-2.5 hover:bg-white/30 transition-colors"
-          >
-            <LinkIcon size={14} aria-hidden="true" />
-            {meeting.meeting_provider === "Google Meet"
-              ? "Join Google Meet"
-              : "Join Meeting"}
-          </a>
-        ) : (
-          <div className="w-full bg-white/10 border border-white/20 text-white/60 text-sm font-medium rounded-xl py-2.5 text-center">
-            No meeting link
-          </div>
-        )}
-      </div>
-    </section>
-  );
-}
-
 function AssignmentListItem({
   assignment,
   isTeacher,
@@ -437,37 +352,43 @@ function AssignmentListItem({
     : `/homework/${assignment.id}`;
 
   return (
-    <li className="bg-card-bg border border-soft-border rounded-xl p-4 flex items-center gap-3 shadow-card">
-      <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
-        <BookOpen size={15} className="text-primary" aria-hidden="true" />
-      </div>
-      <Link href={href} className="min-w-0 flex-1 hover:opacity-80 transition-opacity">
-        <p className="text-sm font-medium text-dark-text truncate">
-          {assignment.title}
-        </p>
-        <p className="text-xs text-muted-text truncate">
-          {formatDueDate(assignment.due_at)}
-        </p>
+    <li>
+      <Link
+        href={href}
+        aria-label={`${isTeacher ? "Manage" : "Open"} assignment: ${assignment.title}`}
+        className="bg-card-bg border border-soft-border rounded-xl p-4 flex items-center gap-3 shadow-card hover:border-primary/30 hover:shadow-card-hover transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
+      >
+        <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
+          <BookOpen size={15} className="text-primary" aria-hidden="true" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-dark-text truncate">
+            {assignment.title}
+          </p>
+          <p className="text-xs text-muted-text truncate">
+            {formatDueDate(assignment.due_at)}
+          </p>
+        </div>
+        {isTeacher ? (
+          <span
+            className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${
+              assignment.status === "published"
+                ? "bg-green-100 text-green-700"
+                : "bg-slate-100 text-slate-500"
+            }`}
+          >
+            {assignment.status === "published" ? "Published" : "Draft"}
+          </span>
+        ) : overdue ? (
+          <span className="text-xs font-medium bg-red-50 text-red-700 ring-1 ring-red-200 px-2.5 py-0.5 rounded-full shrink-0">
+            Overdue
+          </span>
+        ) : (
+          <span className="text-xs font-medium bg-blue-50 text-blue-700 ring-1 ring-blue-200 px-2.5 py-0.5 rounded-full shrink-0">
+            Upcoming
+          </span>
+        )}
       </Link>
-      {isTeacher ? (
-        <span
-          className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${
-            assignment.status === "published"
-              ? "bg-green-100 text-green-700"
-              : "bg-slate-100 text-slate-500"
-          }`}
-        >
-          {assignment.status === "published" ? "Published" : "Draft"}
-        </span>
-      ) : overdue ? (
-        <span className="text-xs font-medium bg-red-50 text-red-700 ring-1 ring-red-200 px-2.5 py-0.5 rounded-full shrink-0">
-          Overdue
-        </span>
-      ) : (
-        <span className="text-xs font-medium bg-blue-50 text-blue-700 ring-1 ring-blue-200 px-2.5 py-0.5 rounded-full shrink-0">
-          Upcoming
-        </span>
-      )}
     </li>
   );
 }

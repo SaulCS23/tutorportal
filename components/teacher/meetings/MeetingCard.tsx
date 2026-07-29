@@ -9,6 +9,9 @@ import type { ClassMeeting } from "@/lib/supabase/helpers";
 import StatusBadge from "@/components/ui/StatusBadge";
 import DatePicker from "@/components/ui/DatePicker";
 import CancelMeetingButton from "./CancelMeetingButton";
+import MeetingDetailModal from "@/components/schedule/MeetingDetailModal";
+import type { ScheduleItem } from "@/components/schedule/scheduleItems";
+import { clickableCardProps, stopCardClick, CLICKABLE_CARD_CLASSES } from "@/lib/clickableCard";
 
 const PROVIDER_OPTIONS = [
   { value: "Google Meet", label: "Google Meet" },
@@ -45,6 +48,7 @@ const formatDate = (dateStr: string) =>
 export default function MeetingCard({ meeting }: { meeting: ClassMeeting }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
+  const [showDetail, setShowDetail] = useState(false);
 
   const [title, setTitle] = useState(meeting.title);
   const [description, setDescription] = useState(meeting.description ?? "");
@@ -124,8 +128,36 @@ export default function MeetingCard({ meeting }: { meeting: ClassMeeting }) {
   const isInPerson = (editing ? provider : meeting.meeting_provider) === "In person";
   const safeLink = isSafeUrl(meeting.meeting_link) ? meeting.meeting_link! : null;
 
+  const detailItem: ScheduleItem = {
+    id: meeting.id,
+    source: "meeting",
+    classId: meeting.class_id,
+    className: "",
+    subject: null,
+    teacherId: null,
+    date: meeting.meeting_date,
+    startTime: meeting.start_time,
+    endTime: meeting.end_time,
+    timezone: meeting.timezone,
+    status: meeting.status,
+    title: meeting.title,
+    location: meeting.location,
+    meetingProvider: meeting.meeting_provider,
+    meetingLink: meeting.meeting_link,
+  };
+
+  const cardProps = editing
+    ? {}
+    : clickableCardProps(() => setShowDetail(true), `Open meeting details: ${meeting.title}`);
+
   return (
-    <div className="bg-card-bg border border-soft-border rounded-2xl shadow-card overflow-hidden">
+    <>
+    <div
+      {...cardProps}
+      className={`bg-card-bg border border-soft-border rounded-2xl shadow-card overflow-hidden ${
+        editing ? "" : CLICKABLE_CARD_CLASSES
+      }`}
+    >
       {/* Header (always visible) */}
       <div className="flex items-start gap-3 px-5 py-4">
         <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0 mt-0.5">
@@ -146,7 +178,14 @@ export default function MeetingCard({ meeting }: { meeting: ClassMeeting }) {
         </div>
         <button
           type="button"
-          onClick={() => (editing ? cancelEdit() : setEditing(true))}
+          onClick={(e) => {
+            stopCardClick(e);
+            if (editing) {
+              cancelEdit();
+            } else {
+              setEditing(true);
+            }
+          }}
           aria-label={editing ? "Cancel edit" : "Edit meeting"}
           className="p-1.5 text-muted-text hover:text-dark-text hover:bg-slate-100 rounded-lg transition-colors shrink-0"
         >
@@ -174,6 +213,7 @@ export default function MeetingCard({ meeting }: { meeting: ClassMeeting }) {
                   href={safeLink}
                   target="_blank"
                   rel="noopener noreferrer"
+                  onClick={stopCardClick}
                   className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline mt-1"
                 >
                   <LinkIcon size={12} aria-hidden="true" />
@@ -183,7 +223,7 @@ export default function MeetingCard({ meeting }: { meeting: ClassMeeting }) {
             </div>
           )}
           {meeting.status === "scheduled" && (
-            <div className="border-t border-soft-border px-5 py-3">
+            <div className="border-t border-soft-border px-5 py-3" onClick={stopCardClick}>
               <CancelMeetingButton meetingId={meeting.id} />
             </div>
           )}
@@ -355,5 +395,13 @@ export default function MeetingCard({ meeting }: { meeting: ClassMeeting }) {
         </div>
       )}
     </div>
+      {showDetail && (
+        <MeetingDetailModal
+          item={detailItem}
+          isTeacher
+          onClose={() => setShowDetail(false)}
+        />
+      )}
+    </>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { X, Clock, MapPin, Link as LinkIcon, AlertCircle } from "lucide-react";
 import type { Matcher } from "react-day-picker";
 import { createClient } from "@/lib/supabase/client";
@@ -60,13 +61,19 @@ const REQUEST_STATUS_LABEL: Record<MakeupRequest["status"], string> = {
 export default function MeetingDetailModal({
   item,
   teacherName,
+  isTeacher = false,
   onClose,
 }: {
   item: ScheduleItem;
   teacherName?: string | null;
+  /** Renders a teacher-appropriate, read-only body instead of the
+   *  student cancellation/makeup-request flow — the eligibility and
+   *  "own request" RPCs below are student-scoped (a teacher has no
+   *  "own" makeup request), so they're skipped entirely for teachers. */
+  isTeacher?: boolean;
   onClose: () => void;
 }) {
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!isTeacher);
   const [eligibility, setEligibility] = useState<MeetingCancellationEligibility | null>(null);
   const [existingRequest, setExistingRequest] = useState<MakeupRequest | null>(null);
   const [existingOptions, setExistingOptions] = useState<MakeupOption[]>([]);
@@ -78,6 +85,10 @@ export default function MeetingDetailModal({
   const [submitError, setSubmitError] = useState("");
 
   useEffect(() => {
+    if (isTeacher) {
+      setLoading(false);
+      return;
+    }
     let cancelled = false;
     async function load() {
       const supabase = createClient();
@@ -95,7 +106,7 @@ export default function MeetingDetailModal({
     return () => {
       cancelled = true;
     };
-  }, [item.id]);
+  }, [item.id, isTeacher]);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -191,7 +202,9 @@ export default function MeetingDetailModal({
             <h2 id="meeting-modal-title" className="text-base font-bold text-dark-text truncate">
               {heading}
             </h2>
-            <p className="text-xs text-muted-text mt-0.5 truncate">{item.className}</p>
+            {item.className && (
+              <p className="text-xs text-muted-text mt-0.5 truncate">{item.className}</p>
+            )}
           </div>
           <button
             type="button"
@@ -234,7 +247,32 @@ export default function MeetingDetailModal({
           </div>
 
           <div className="border-t border-soft-border pt-4">
-            {loading ? (
+            {isTeacher ? (
+              <div className="flex flex-col gap-3">
+                {item.status === "cancelled" ? (
+                  <p className="text-sm text-muted-text">This meeting has been cancelled.</p>
+                ) : item.status === "completed" ? (
+                  <p className="text-sm text-muted-text">This meeting has already taken place.</p>
+                ) : item.status === "group_pending_reschedule" ? (
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
+                    A majority of the class requested to reschedule this meeting. Review each
+                    student&rsquo;s proposed times and confirm a new one from the class Meetings
+                    page.
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-text">
+                    Edit the date, time, location, or link — or cancel this meeting — from the
+                    class Meetings page.
+                  </p>
+                )}
+                <Link
+                  href={`/teacher/classes/${item.classId}/meetings`}
+                  className="text-sm font-medium text-primary hover:underline w-fit"
+                >
+                  Go to Meetings
+                </Link>
+              </div>
+            ) : loading ? (
               <p className="text-sm text-muted-text">Loading cancellation policy…</p>
             ) : item.status === "cancelled" ? (
               <p className="text-sm text-muted-text">This meeting has been cancelled.</p>

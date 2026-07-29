@@ -171,7 +171,7 @@ export default function ScheduleView({
             teacherMap={teacherMap}
             onPrevWeek={goPrevWeek}
             onNextWeek={goNextWeek}
-            onOpenMeeting={isTeacher ? undefined : setOpenMeetingItem}
+            onOpenMeeting={setOpenMeetingItem}
           />
         </div>
 
@@ -180,7 +180,7 @@ export default function ScheduleView({
             items={upcoming}
             isTeacher={isTeacher}
             teacherMap={teacherMap}
-            onOpenMeeting={isTeacher ? undefined : setOpenMeetingItem}
+            onOpenMeeting={setOpenMeetingItem}
           />
         </div>
       </div>
@@ -189,8 +189,9 @@ export default function ScheduleView({
         <MeetingDetailModal
           item={openMeetingItem}
           teacherName={
-            openMeetingItem.teacherId ? teacherMap[openMeetingItem.teacherId] : null
+            isTeacher || !openMeetingItem.teacherId ? null : teacherMap[openMeetingItem.teacherId]
           }
+          isTeacher={isTeacher}
           onClose={() => setOpenMeetingItem(null)}
         />
       )}

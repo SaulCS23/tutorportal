@@ -2,6 +2,7 @@ import Link from "next/link";
 import { MapPin, Link as LinkIcon } from "lucide-react";
 import { formatTime, isSafeUrl } from "@/lib/utils";
 import StatusBadge from "@/components/ui/StatusBadge";
+import { clickableCardProps, stopCardClick, CLICKABLE_CARD_CLASSES } from "@/lib/clickableCard";
 import type { ScheduleItem } from "./scheduleItems";
 
 export default function ScheduleItemCard({
@@ -27,16 +28,6 @@ export default function ScheduleItemCard({
   const classHref = isTeacher ? `/teacher/classes/${item.classId}` : `/classes/${item.classId}`;
   const canOpenMeeting = Boolean(onOpenMeeting) && item.source === "meeting";
 
-  // The class-name link and the Join Meeting link are nested inside the
-  // card, which (when canOpenMeeting) is itself a click target for the
-  // modal — without stopping propagation here, clicking either would
-  // also bubble up and open the modal, or (worse, if a card ever became
-  // an ancestor <Link>) drag the browser to the class page instead of
-  // just following the link that was actually clicked.
-  function stopBubble(e: React.MouseEvent) {
-    e.stopPropagation();
-  }
-
   const joinRow = (item.location || safeLink) && (
     <div className="flex flex-wrap items-center gap-3 mt-2">
       {item.location && (
@@ -50,7 +41,7 @@ export default function ScheduleItemCard({
           href={safeLink}
           target="_blank"
           rel="noopener noreferrer"
-          onClick={stopBubble}
+          onClick={stopCardClick}
           className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:text-primary-dark transition-colors"
         >
           <LinkIcon size={11} aria-hidden="true" />
@@ -71,16 +62,8 @@ export default function ScheduleItemCard({
     // guarding against.
     return (
       <li
-        role="button"
-        tabIndex={0}
-        onClick={() => onOpenMeeting!(item)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            onOpenMeeting!(item);
-          }
-        }}
-        className={`rounded-xl px-4 py-3 border-l-4 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary ${
+        {...clickableCardProps(() => onOpenMeeting!(item), `Open meeting details: ${heading}`)}
+        className={`rounded-xl px-4 py-3 border-l-4 ${CLICKABLE_CARD_CLASSES} ${
           isCancelled ? "bg-slate-50 border-slate-300" : "bg-primary/5 border-primary"
         }`}
       >
@@ -110,7 +93,7 @@ export default function ScheduleItemCard({
           {showClassName && (
             <Link
               href={classHref}
-              onClick={stopBubble}
+              onClick={stopCardClick}
               className="text-xs text-primary hover:underline mt-0.5 inline-block"
             >
               {item.className}
