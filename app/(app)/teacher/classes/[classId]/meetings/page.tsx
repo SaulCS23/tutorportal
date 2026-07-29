@@ -29,6 +29,7 @@ type RawMakeupOption = {
 
 type RawGroupRequest = {
   id: string;
+  meeting_id: string;
   threshold_count: number;
   eligible_student_count: number;
   class_meetings: {
@@ -40,6 +41,13 @@ type RawGroupRequest = {
     meeting_link: string | null;
     location: string | null;
   } | null;
+};
+
+type RawProposal = {
+  id: string;
+  meeting_id: string;
+  created_at: string;
+  profiles: { full_name: string } | null;
 };
 
 export default async function TeacherMeetingsPage({ params }: Props) {
@@ -70,7 +78,7 @@ export default async function TeacherMeetingsPage({ params }: Props) {
         // (meeting_id and replacement_meeting_id) — the embed must name
         // meeting_id explicitly, or PostgREST rejects the query as an
         // ambiguous embedding and this section silently comes back empty.
-        "id, threshold_count, eligible_student_count, created_at, class_meetings!meeting_id ( title, start_time, end_time, timezone, meeting_provider, meeting_link, location )"
+        "id, meeting_id, threshold_count, eligible_student_count, created_at, class_meetings!meeting_id ( title, start_time, end_time, timezone, meeting_provider, meeting_link, location )"
       )
       .eq("class_id", classId)
       .eq("status", "pending")
@@ -104,6 +112,42 @@ export default async function TeacherMeetingsPage({ params }: Props) {
     }
   }
 
+  // Once a meeting crosses the majority threshold, every individual
+  // makeup request tied to it is flipped to 'superseded_by_group_reschedule'
+  // (see recheck_group_majority in 20240114) — but the three times each
+  // student originally proposed are still valuable context for the
+  // teacher choosing a single new group time, so this fetch deliberately
+  // does not filter by status the way the makeupRequestsData query above
+  // does; every request for these meetings is pulled regardless of state.
+  const proposalsByMeeting: Record<string, RawProposal[]> = {};
+  const proposalOptionsByRequest: Record<string, RawMakeupOption[]> = {};
+
+  const groupMeetingIds = rawGroupRequests.map((r) => r.meeting_id);
+  if (groupMeetingIds.length > 0) {
+    const { data: proposalsData } = await supabase
+      .from("individual_makeup_requests")
+      .select("id, meeting_id, created_at, profiles ( full_name )")
+      .in("meeting_id", groupMeetingIds)
+      .order("created_at", { ascending: true });
+
+    const rawProposals = (proposalsData as unknown as RawProposal[]) ?? [];
+    for (const p of rawProposals) {
+      (proposalsByMeeting[p.meeting_id] ??= []).push(p);
+    }
+
+    if (rawProposals.length > 0) {
+      const { data: proposalOptionsData } = await supabase
+        .from("individual_makeup_options")
+        .select("id, request_id, proposed_start_at, proposed_end_at")
+        .in("request_id", rawProposals.map((p) => p.id))
+        .order("proposed_start_at", { ascending: true });
+
+      for (const opt of (proposalOptionsData as RawMakeupOption[]) ?? []) {
+        (proposalOptionsByRequest[opt.request_id] ??= []).push(opt);
+      }
+    }
+  }
+
   const makeupRequests: MakeupRequestForReview[] = rawMakeupRequests.map((r) => ({
     id: r.id,
     reason: r.reason,
@@ -129,6 +173,16 @@ export default async function TeacherMeetingsPage({ params }: Props) {
     location: r.class_meetings?.location ?? null,
     thresholdCount: r.threshold_count,
     eligibleStudentCount: r.eligible_student_count,
+    proposals: (proposalsByMeeting[r.meeting_id] ?? []).map((p) => ({
+      id: p.id,
+      studentName: p.profiles?.full_name ?? "Unknown Student",
+      createdAt: p.created_at,
+      options: (proposalOptionsByRequest[p.id] ?? []).map((o) => ({
+        id: o.id,
+        proposed_start_at: o.proposed_start_at,
+        proposed_end_at: o.proposed_end_at,
+      })),
+    })),
   }));
 
   return (

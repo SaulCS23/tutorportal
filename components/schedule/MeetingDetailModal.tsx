@@ -239,9 +239,38 @@ export default function MeetingDetailModal({
             ) : item.status === "cancelled" ? (
               <p className="text-sm text-muted-text">This meeting has been cancelled.</p>
             ) : item.status === "group_pending_reschedule" ? (
-              <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
-                A majority of the class requested to reschedule this meeting. Your teacher is
-                coordinating a new time — no further action is needed here.
+              <div className="flex flex-col gap-3">
+                <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
+                  A majority of the class requested to reschedule this meeting. Your teacher is
+                  coordinating a new time for everyone — no further action is needed here.
+                </div>
+                {existingRequest && (
+                  <div className="flex flex-col gap-3">
+                    <p className="text-sm font-medium text-dark-text">
+                      Your request was received.
+                    </p>
+                    <p className="text-xs text-muted-text -mt-2">
+                      {REQUEST_STATUS_LABEL[existingRequest.status]}
+                    </p>
+                    {existingRequest.reason && (
+                      <p className="text-sm text-muted-text">Your reason: {existingRequest.reason}</p>
+                    )}
+                    <div className="flex flex-col gap-2">
+                      <p className="text-xs font-semibold text-muted-text uppercase tracking-wide">
+                        The times you proposed, for reference
+                      </p>
+                      {existingOptions.map((opt, i) => (
+                        <div
+                          key={opt.id}
+                          className="text-xs rounded-lg px-3 py-2 border bg-slate-50 border-soft-border text-muted-text"
+                        >
+                          Option {i + 1}: {formatInstant(opt.proposed_start_at, item.timezone)} –{" "}
+                          {formatInstant(opt.proposed_end_at, item.timezone)}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             ) : item.status === "completed" ? (
               <p className="text-sm text-muted-text">This meeting has already taken place.</p>

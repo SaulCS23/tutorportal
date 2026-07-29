@@ -7,6 +7,13 @@ import { formatTime } from "@/lib/utils";
 import DatePicker from "@/components/ui/DatePicker";
 import { rejectGroupReschedule, resolveGroupReschedule } from "@/components/schedule/meetingCancellation";
 
+export type ProposalForReview = {
+  id: string;
+  studentName: string;
+  createdAt: string;
+  options: { id: string; proposed_start_at: string; proposed_end_at: string }[];
+};
+
 export type GroupRescheduleForReview = {
   id: string;
   meetingTitle: string;
@@ -18,7 +25,49 @@ export type GroupRescheduleForReview = {
   location: string | null;
   thresholdCount: number;
   eligibleStudentCount: number;
+  /** The individual makeup requests that led to this majority — kept and
+   *  shown even though their own status became 'superseded_by_group_reschedule',
+   *  since the times each student proposed are still useful reference for
+   *  the teacher picking one final group time. Informational only: there
+   *  is no per-proposal approve/reject here, only the group-level actions
+   *  below. */
+  proposals: ProposalForReview[];
 };
+
+function formatProposalOption(
+  opt: { proposed_start_at: string; proposed_end_at: string },
+  timezone: string
+): string {
+  const start = new Date(opt.proposed_start_at);
+  const end = new Date(opt.proposed_end_at);
+  const dateLabel = start.toLocaleDateString("en-US", {
+    timeZone: timezone,
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+  const startLabel = start.toLocaleTimeString("en-US", {
+    timeZone: timezone,
+    hour: "numeric",
+    minute: "2-digit",
+  });
+  const endLabel = end.toLocaleTimeString("en-US", {
+    timeZone: timezone,
+    hour: "numeric",
+    minute: "2-digit",
+  });
+  return `${dateLabel}, ${startLabel} – ${endLabel}`;
+}
+
+function formatRequestedAt(iso: string, timezone: string): string {
+  return new Date(iso).toLocaleString("en-US", {
+    timeZone: timezone,
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
 
 const inputCls =
   "w-full px-3 py-2 text-sm bg-page-bg border border-soft-border rounded-xl text-dark-text focus:outline-none focus:ring-2 focus:ring-primary transition";
@@ -119,6 +168,31 @@ export default function GroupRescheduleRequestCard({
           cancellation ({majorityPct}%)
         </p>
       </div>
+
+      {request.proposals.length > 0 && (
+        <div className="border-t border-soft-border pt-3 flex flex-col gap-3">
+          <p className="text-xs font-semibold text-muted-text uppercase tracking-wide">
+            Proposed times submitted (reference only)
+          </p>
+          {request.proposals.map((p) => (
+            <div key={p.id} className="rounded-xl border border-soft-border px-3 py-2.5 flex flex-col gap-1.5">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <p className="text-sm font-medium text-dark-text">{p.studentName}</p>
+                <p className="text-xs text-muted-text">
+                  Requested {formatRequestedAt(p.createdAt, request.meetingTimezone)}
+                </p>
+              </div>
+              <div className="flex flex-col gap-1">
+                {p.options.map((opt, i) => (
+                  <p key={opt.id} className="text-xs text-muted-text">
+                    Option {i + 1}: {formatProposalOption(opt, request.meetingTimezone)}
+                  </p>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {error && (
         <p role="alert" className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
@@ -231,7 +305,7 @@ export default function GroupRescheduleRequestCard({
             disabled={loading}
             className="px-4 text-sm font-medium text-red-600 border border-red-200 bg-red-50 rounded-xl hover:bg-red-100 transition-colors disabled:opacity-60"
           >
-            Reject
+            Reject Request
           </button>
         </div>
       )}
