@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { BookOpen, Pencil, X, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { combineDateAndTime, splitDateAndTime } from "@/lib/utils";
+import DatePicker from "@/components/ui/DatePicker";
 import DeleteAssignmentButton from "./DeleteAssignmentButton";
 import AssignmentFileManager from "./AssignmentFileManager";
 
@@ -18,12 +20,6 @@ export type Assignment = {
   created_at: string;
   updated_at: string;
 };
-
-function toDatetimeLocal(iso: string): string {
-  const d = new Date(iso);
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
-}
 
 const formatDate = (iso: string) =>
   new Date(iso).toLocaleDateString("en-US", {
@@ -43,9 +39,9 @@ export default function AssignmentCard({
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(assignment.title);
   const [instructions, setInstructions] = useState(assignment.instructions ?? "");
-  const [dueAt, setDueAt] = useState(
-    assignment.due_at ? toDatetimeLocal(assignment.due_at) : ""
-  );
+  const initialDueAt = assignment.due_at ? splitDateAndTime(assignment.due_at) : null;
+  const [dueDate, setDueDate] = useState(initialDueAt?.date ?? "");
+  const [dueTime, setDueTime] = useState(initialDueAt?.time ?? "");
   const [points, setPoints] = useState(String(assignment.points));
   const [status, setStatus] = useState<"draft" | "published">(assignment.status);
   const [loading, setLoading] = useState(false);
@@ -54,7 +50,9 @@ export default function AssignmentCard({
   function cancelEdit() {
     setTitle(assignment.title);
     setInstructions(assignment.instructions ?? "");
-    setDueAt(assignment.due_at ? toDatetimeLocal(assignment.due_at) : "");
+    const reset = assignment.due_at ? splitDateAndTime(assignment.due_at) : null;
+    setDueDate(reset?.date ?? "");
+    setDueTime(reset?.time ?? "");
     setPoints(String(assignment.points));
     setStatus(assignment.status);
     setError("");
@@ -75,7 +73,7 @@ export default function AssignmentCard({
       .update({
         title: title.trim(),
         instructions: instructions.trim() || null,
-        due_at: dueAt ? new Date(dueAt).toISOString() : null,
+        due_at: combineDateAndTime(dueDate, dueTime),
         points: pts,
         status,
       })
@@ -176,12 +174,16 @@ export default function AssignmentCard({
 
             <div className="grid sm:grid-cols-2 gap-3">
               <FieldLabel label="Due Date" optional>
-                <input
-                  type="datetime-local"
-                  value={dueAt}
-                  onChange={(e) => setDueAt(e.target.value)}
-                  className={inputCls}
-                />
+                <div className="flex flex-col gap-2">
+                  <DatePicker value={dueDate} onChange={setDueDate} />
+                  <input
+                    type="time"
+                    value={dueTime}
+                    onChange={(e) => setDueTime(e.target.value)}
+                    aria-label="Due time (optional, defaults to 11:59 PM)"
+                    className={inputCls}
+                  />
+                </div>
               </FieldLabel>
               <FieldLabel label="Points">
                 <input

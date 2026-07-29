@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, BookOpen, Clock, Award } from "lucide-react";
 import { getCurrentProfile } from "@/lib/supabase/helpers";
-import { getInitials } from "@/lib/utils";
+import { getInitials, isClassNameRedundant } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/server";
 import TopBar from "@/components/nav/TopBar";
 import StatusBadge from "@/components/ui/StatusBadge";
@@ -135,7 +135,11 @@ export default async function AssignmentDetailPage({ params }: Props) {
             <StatusBadge status={getSubmissionBadge()} />
           </div>
           <p className="text-xs text-muted-text mt-1">
-            {assignment.classes?.name ?? "Unknown class"} · {teacherName}
+            {assignment.classes?.name &&
+              !isClassNameRedundant(assignment.title, assignment.classes.name) && (
+                <>{assignment.classes.name} · </>
+              )}
+            {teacherName}
           </p>
         </div>
 

@@ -10,7 +10,14 @@ import {
   Link as LinkIcon,
 } from "lucide-react";
 import { getCurrentProfile } from "@/lib/supabase/helpers";
-import { getInitials, DAY_NAMES, formatTime, isSafeUrl, findNextSchedule } from "@/lib/utils";
+import {
+  getInitials,
+  DAY_NAMES,
+  formatTime,
+  isSafeUrl,
+  findNextSchedule,
+  isClassNameRedundant,
+} from "@/lib/utils";
 import { createClient } from "@/lib/supabase/server";
 import TopBar from "@/components/nav/TopBar";
 import SectionHeading from "@/components/ui/SectionHeading";
@@ -447,7 +454,10 @@ function AssignmentListItem({
           {assignment.title}
         </p>
         <p className="text-xs text-muted-text truncate">
-          {assignment.classes?.name ?? "Unknown Class"} ·{" "}
+          {assignment.classes?.name &&
+            !isClassNameRedundant(assignment.title, assignment.classes.name) && (
+              <>{assignment.classes.name} · </>
+            )}
           {formatDueDate(assignment.due_at)}
         </p>
       </Link>

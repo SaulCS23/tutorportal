@@ -4,13 +4,16 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { combineDateAndTime } from "@/lib/utils";
+import DatePicker from "@/components/ui/DatePicker";
 
 export default function CreateAssignmentForm({ classId }: { classId: string }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [instructions, setInstructions] = useState("");
-  const [dueAt, setDueAt] = useState("");
+  const [dueDate, setDueDate] = useState("");
+  const [dueTime, setDueTime] = useState("");
   const [points, setPoints] = useState("0");
   const [status, setStatus] = useState<"draft" | "published">("draft");
   const [loading, setLoading] = useState(false);
@@ -19,7 +22,8 @@ export default function CreateAssignmentForm({ classId }: { classId: string }) {
   function reset() {
     setTitle("");
     setInstructions("");
-    setDueAt("");
+    setDueDate("");
+    setDueTime("");
     setPoints("0");
     setStatus("draft");
     setError("");
@@ -46,7 +50,7 @@ export default function CreateAssignmentForm({ classId }: { classId: string }) {
       class_id: classId,
       title: title.trim(),
       instructions: instructions.trim() || null,
-      due_at: dueAt ? new Date(dueAt).toISOString() : null,
+      due_at: combineDateAndTime(dueDate, dueTime),
       points: pts,
       status,
     });
@@ -101,12 +105,17 @@ export default function CreateAssignmentForm({ classId }: { classId: string }) {
 
         <div className="grid sm:grid-cols-2 gap-3">
           <FieldLabel label="Due Date" optional>
-            <input
-              type="datetime-local"
-              value={dueAt}
-              onChange={(e) => setDueAt(e.target.value)}
-              className={inputCls}
-            />
+            <div className="flex flex-col gap-2">
+              <DatePicker value={dueDate} onChange={setDueDate} />
+              <input
+                type="time"
+                value={dueTime}
+                onChange={(e) => setDueTime(e.target.value)}
+                placeholder="Defaults to 11:59 PM"
+                aria-label="Due time (optional, defaults to 11:59 PM)"
+                className={inputCls}
+              />
+            </div>
           </FieldLabel>
 
           <FieldLabel label="Points" required>

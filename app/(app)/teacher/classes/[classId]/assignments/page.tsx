@@ -41,7 +41,11 @@ export default async function AssignmentsPage({ params }: Props) {
       ) : (
         <ul className="flex flex-col gap-4" role="list">
           {assignments.map((a) => (
-            <li key={a.id}>
+            // Keying on updated_at too forces a remount (not just a prop
+            // update) whenever this assignment is actually saved, so the
+            // edit form's local state can never go stale relative to
+            // what's really in the database.
+            <li key={`${a.id}:${a.updated_at}`}>
               <AssignmentCard assignment={a} classId={classId} />
             </li>
           ))}

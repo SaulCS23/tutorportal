@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import Link from "next/link";
 import { Search, BookOpen } from "lucide-react";
 import StatusBadge from "@/components/ui/StatusBadge";
+import { isClassNameRedundant } from "@/lib/utils";
 
 export type AssignmentItem = {
   id: string;
@@ -155,7 +156,7 @@ export default function HomeworkList({ assignments, isTeacher }: HomeworkListPro
                       >
                         {a.title}
                       </Link>
-                      {a.class_name.trim().toLowerCase() !== a.title.trim().toLowerCase() && (
+                      {!isClassNameRedundant(a.title, a.class_name) && (
                         <Link
                           href={classHref}
                           className="text-xs text-primary hover:underline mt-0.5 inline-block"

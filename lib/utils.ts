@@ -24,6 +24,46 @@ export function getInitials(
   return (f[0] + l[0]).toUpperCase();
 }
 
+/**
+ * True when showing a class name next to an assignment/homework title
+ * would be redundant — either they're the same (trimmed, case-insensitive),
+ * or the title already contains the full class name as a substring (e.g.
+ * title "SAT Math Practice Set 4" next to class "SAT Math").
+ */
+export function isClassNameRedundant(title: string, className: string): boolean {
+  const t = title.trim().toLowerCase();
+  const c = className.trim().toLowerCase();
+  if (!c) return true;
+  return t === c || t.includes(c);
+}
+
+/**
+ * Combines a "YYYY-MM-DD" date and an optional "HH:MM" time into an ISO
+ * instant, using local Date construction — never string-parsing a
+ * datetime-local value, whose native browser widget silently produces an
+ * empty string if a user fills in the date but not the time portion.
+ * Defaults to end-of-day (23:59) when a date is chosen but no time is
+ * set, so a due date is never silently dropped just because the time
+ * segment wasn't touched.
+ */
+export function combineDateAndTime(dateStr: string, timeStr: string): string | null {
+  if (!dateStr) return null;
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const [h, min] = (timeStr || "23:59").split(":").map(Number);
+  if (!y || !m || !d) return null;
+  return new Date(y, m - 1, d, h || 0, min || 0).toISOString();
+}
+
+/** The inverse of combineDateAndTime, for pre-filling an edit form from a stored ISO instant. */
+export function splitDateAndTime(iso: string): { date: string; time: string } {
+  const d = new Date(iso);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return {
+    date: `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`,
+    time: `${p(d.getHours())}:${p(d.getMinutes())}`,
+  };
+}
+
 // ── Schedule utilities ────────────────────────────────────────
 
 export const DAY_NAMES = [
