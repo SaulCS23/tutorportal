@@ -5,7 +5,10 @@ export type NotificationType =
   | "group_pending_reschedule"
   | "makeup_approved"
   | "makeup_rejected"
-  | "group_rescheduled";
+  | "group_rescheduled"
+  | "homework_assigned"
+  | "homework_submitted"
+  | "homework_graded";
 
 export type Notification = {
   id: string;

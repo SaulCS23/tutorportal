@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { formatTime } from "@/lib/utils";
+import { formatTime, splitDateAndTime } from "@/lib/utils";
 import DatePicker from "@/components/ui/DatePicker";
 import { rejectGroupReschedule, resolveGroupReschedule } from "@/components/schedule/meetingCancellation";
 
@@ -28,11 +28,21 @@ export type GroupRescheduleForReview = {
   /** The individual makeup requests that led to this majority — kept and
    *  shown even though their own status became 'superseded_by_group_reschedule',
    *  since the times each student proposed are still useful reference for
-   *  the teacher picking one final group time. Informational only: there
-   *  is no per-proposal approve/reject here, only the group-level actions
-   *  below. */
+   *  the teacher picking one final group time, and are now directly
+   *  selectable to pre-fill the reschedule form below. */
   proposals: ProposalForReview[];
 };
+
+/** One of a student's three proposed slots, or the teacher's own custom time. */
+type Choice =
+  | {
+      kind: "proposal";
+      studentName: string;
+      optionIndex: number;
+      startAt: string;
+      endAt: string;
+    }
+  | { kind: "other" };
 
 function formatProposalOption(
   opt: { proposed_start_at: string; proposed_end_at: string },
@@ -86,7 +96,8 @@ export default function GroupRescheduleRequestCard({
   request: GroupRescheduleForReview;
 }) {
   const router = useRouter();
-  const [showForm, setShowForm] = useState(false);
+  const [showChoices, setShowChoices] = useState(false);
+  const [choice, setChoice] = useState<Choice | null>(null);
   const [meetingDate, setMeetingDate] = useState("");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
@@ -97,10 +108,52 @@ export default function GroupRescheduleRequestCard({
   const [note, setNote] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [resolved, setResolved] = useState(false);
 
   const majorityPct = Math.round(
     (request.thresholdCount / request.eligibleStudentCount) * 100
   );
+
+  function selectProposalOption(
+    studentName: string,
+    optionIndex: number,
+    opt: { proposed_start_at: string; proposed_end_at: string }
+  ) {
+    setChoice({
+      kind: "proposal",
+      studentName,
+      optionIndex,
+      startAt: opt.proposed_start_at,
+      endAt: opt.proposed_end_at,
+    });
+    const start = splitDateAndTime(opt.proposed_start_at, request.meetingTimezone);
+    const end = splitDateAndTime(opt.proposed_end_at, request.meetingTimezone);
+    setMeetingDate(start.date);
+    setStartTime(start.time);
+    setEndTime(end.time);
+  }
+
+  function selectOther() {
+    setChoice({ kind: "other" });
+    setMeetingDate("");
+    setStartTime("");
+    setEndTime("");
+  }
+
+  function startFlow() {
+    setError("");
+    setShowChoices(true);
+  }
+
+  function cancelFlow() {
+    setError("");
+    setShowChoices(false);
+    setChoice(null);
+  }
+
+  function backToChoices() {
+    setChoice(null);
+  }
 
   async function handleReject() {
     setError("");
@@ -153,7 +206,30 @@ export default function GroupRescheduleRequestCard({
       setError(rpcError);
       return;
     }
-    router.refresh();
+    setResolved(true);
+  }
+
+  if (resolved) {
+    return (
+      <div className="bg-card-bg border border-soft-border rounded-2xl shadow-card p-5 flex flex-col gap-3">
+        <p className="text-sm font-semibold text-dark-text">{request.meetingTitle}</p>
+        <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 flex flex-col gap-1">
+          <p className="text-sm font-semibold text-green-800">Meeting rescheduled</p>
+          <p className="text-xs text-green-700">
+            All {request.eligibleStudentCount} student
+            {request.eligibleStudentCount === 1 ? "" : "s"} in the class have been notified of
+            the new time.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => router.refresh()}
+          className="self-start text-sm font-medium text-primary hover:underline"
+        >
+          Done
+        </button>
+      </div>
+    );
   }
 
   return (
@@ -169,7 +245,7 @@ export default function GroupRescheduleRequestCard({
         </p>
       </div>
 
-      {request.proposals.length > 0 && (
+      {!showChoices && request.proposals.length > 0 && (
         <div className="border-t border-soft-border pt-3 flex flex-col gap-3">
           <p className="text-xs font-semibold text-muted-text uppercase tracking-wide">
             Proposed times submitted (reference only)
@@ -200,8 +276,100 @@ export default function GroupRescheduleRequestCard({
         </p>
       )}
 
-      {showForm ? (
+      {!showChoices ? (
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={startFlow}
+            className="flex-1 bg-primary text-white text-sm font-semibold py-2 rounded-xl hover:bg-primary-dark transition-colors"
+          >
+            Reschedule Group
+          </button>
+          <button
+            type="button"
+            onClick={handleReject}
+            disabled={loading}
+            className="px-4 text-sm font-medium text-red-600 border border-red-200 bg-red-50 rounded-xl hover:bg-red-100 transition-colors disabled:opacity-60"
+          >
+            Reject Request
+          </button>
+        </div>
+      ) : choice === null ? (
+        <div className="border-t border-soft-border pt-3 flex flex-col gap-3">
+          <p className="text-xs font-semibold text-muted-text uppercase tracking-wide">
+            Choose a time for the new meeting
+          </p>
+          {request.proposals.map((p) => (
+            <div key={p.id} className="flex flex-col gap-1.5">
+              <p className="text-xs font-medium text-dark-text">
+                {p.studentName}{" "}
+                <span className="font-normal text-muted-text">
+                  — requested {formatRequestedAt(p.createdAt, request.meetingTimezone)}
+                </span>
+              </p>
+              <div className="flex flex-col gap-1.5">
+                {p.options.map((opt, i) => (
+                  <label
+                    key={opt.id}
+                    className="flex items-center gap-2 text-sm rounded-xl border border-soft-border px-3 py-2 cursor-pointer hover:bg-slate-50 transition-colors"
+                  >
+                    <input
+                      type="radio"
+                      name={`reschedule-choice-${request.id}`}
+                      onChange={() => selectProposalOption(p.studentName, i, opt)}
+                      className="accent-primary"
+                    />
+                    <span>
+                      Option {i + 1}: {formatProposalOption(opt, request.meetingTimezone)}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          ))}
+
+          <label className="flex items-center gap-2 text-sm rounded-xl border border-dashed border-soft-border px-3 py-2 cursor-pointer hover:bg-slate-50 transition-colors">
+            <input
+              type="radio"
+              name={`reschedule-choice-${request.id}`}
+              onChange={selectOther}
+              className="accent-primary"
+            />
+            <span className="font-medium text-dark-text">Choose another time</span>
+          </label>
+
+          <button
+            type="button"
+            onClick={cancelFlow}
+            className="self-start text-sm text-muted-text hover:text-dark-text transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+      ) : (
         <form onSubmit={handleResolve} noValidate className="flex flex-col gap-3 border-t border-soft-border pt-3">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <p className="text-xs text-muted-text">
+              {choice.kind === "proposal"
+                ? `Using ${choice.studentName}'s Option ${choice.optionIndex + 1}`
+                : "Custom time"}
+            </p>
+            <button
+              type="button"
+              onClick={backToChoices}
+              className="text-xs font-medium text-primary hover:underline"
+            >
+              Change
+            </button>
+          </div>
+
+          {choice.kind === "other" && (
+            <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3.5 py-2.5">
+              Reminder: none of the students proposed this time — make sure you have coordinated
+              it with them directly before confirming.
+            </p>
+          )}
+
           <div className="grid sm:grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-medium text-dark-text">New Date</label>
@@ -283,31 +451,13 @@ export default function GroupRescheduleRequestCard({
             </button>
             <button
               type="button"
-              onClick={() => setShowForm(false)}
+              onClick={cancelFlow}
               className="px-4 text-sm text-muted-text hover:text-dark-text transition-colors"
             >
               Cancel
             </button>
           </div>
         </form>
-      ) : (
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => setShowForm(true)}
-            className="flex-1 bg-primary text-white text-sm font-semibold py-2 rounded-xl hover:bg-primary-dark transition-colors"
-          >
-            Reschedule Group
-          </button>
-          <button
-            type="button"
-            onClick={handleReject}
-            disabled={loading}
-            className="px-4 text-sm font-medium text-red-600 border border-red-200 bg-red-50 rounded-xl hover:bg-red-100 transition-colors disabled:opacity-60"
-          >
-            Reject Request
-          </button>
-        </div>
       )}
     </div>
   );

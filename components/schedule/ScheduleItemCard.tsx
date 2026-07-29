@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { MapPin, Link as LinkIcon } from "lucide-react";
 import { formatTime, isSafeUrl } from "@/lib/utils";
+import StatusBadge from "@/components/ui/StatusBadge";
 import type { ScheduleItem } from "./scheduleItems";
 
 export default function ScheduleItemCard({
@@ -19,6 +20,7 @@ export default function ScheduleItemCard({
   onOpenMeeting?: (item: ScheduleItem) => void;
 }) {
   const isCancelled = item.status === "cancelled";
+  const isPendingReschedule = item.status === "group_pending_reschedule";
   const heading = item.title ?? item.className;
   const showClassName = item.title !== null && item.className !== heading;
   const safeLink = isSafeUrl(item.meetingLink) ? item.meetingLink! : null;
@@ -103,6 +105,7 @@ export default function ScheduleItemCard({
                 Cancelled
               </span>
             )}
+            {isPendingReschedule && <StatusBadge status={item.status!} />}
           </div>
           {showClassName && (
             <Link
@@ -150,6 +153,7 @@ export default function ScheduleItemCard({
               Cancelled
             </span>
           )}
+          {isPendingReschedule && <StatusBadge status={item.status!} />}
         </div>
         {showClassName && (
           <p className="text-xs text-muted-text mt-0.5">{item.className}</p>

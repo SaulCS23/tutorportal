@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import { formatTime, parseLocalISODate } from "@/lib/utils";
+import StatusBadge from "@/components/ui/StatusBadge";
 import type { ScheduleItem } from "./scheduleItems";
 
 export default function UpcomingMeetings({
@@ -39,9 +40,14 @@ export default function UpcomingMeetings({
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-xs text-muted-text">{formatTime(item.startTime)}</p>
-                  <p className="text-sm font-semibold text-dark-text truncate">
-                    {item.title ?? item.className}
-                  </p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-sm font-semibold text-dark-text truncate">
+                      {item.title ?? item.className}
+                    </p>
+                    {item.status === "group_pending_reschedule" && (
+                      <StatusBadge status={item.status} />
+                    )}
+                  </div>
                   {!isTeacher && teacherName && (
                     <p className="text-xs text-muted-text truncate">with {teacherName}</p>
                   )}
