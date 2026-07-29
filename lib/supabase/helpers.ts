@@ -38,7 +38,9 @@ export type ClassMeeting = {
   meeting_provider: string | null;
   meeting_link: string | null;
   location: string | null;
-  status: "scheduled" | "completed" | "cancelled";
+  status: "scheduled" | "completed" | "cancelled" | "group_pending_reschedule";
+  restricted_to_student_id: string | null;
+  source_meeting_id: string | null;
   created_at: string;
   updated_at: string;
 };

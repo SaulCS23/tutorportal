@@ -26,6 +26,7 @@ export default function WeeklyAgenda({
   teacherMap,
   onPrevWeek,
   onNextWeek,
+  onOpenMeeting,
 }: {
   weekStart: Date;
   weekEnd: Date;
@@ -34,6 +35,7 @@ export default function WeeklyAgenda({
   teacherMap: Record<string, string>;
   onPrevWeek: () => void;
   onNextWeek: () => void;
+  onOpenMeeting?: (item: ScheduleItem) => void;
 }) {
   return (
     <div className="bg-card-bg border border-soft-border rounded-2xl shadow-card p-5 md:p-6">
@@ -81,6 +83,7 @@ export default function WeeklyAgenda({
                       item={item}
                       isTeacher={isTeacher}
                       teacherName={item.teacherId ? teacherMap[item.teacherId] : null}
+                      onOpenMeeting={onOpenMeeting}
                     />
                   ))}
                 </ul>

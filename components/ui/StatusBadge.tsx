@@ -12,7 +12,8 @@ type Status =
   | "late"
   | "missing"
   | "scheduled"
-  | "cancelled";
+  | "cancelled"
+  | "group_pending_reschedule";
 
 const config: Record<Status, { label: string; className: string }> = {
   "not-started": {
@@ -70,6 +71,10 @@ const config: Record<Status, { label: string; className: string }> = {
   cancelled: {
     label: "Cancelled",
     className: "bg-slate-100 text-slate-500",
+  },
+  group_pending_reschedule: {
+    label: "Pending Reschedule",
+    className: "bg-amber-50 text-amber-700 ring-1 ring-amber-200",
   },
 };
 

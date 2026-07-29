@@ -7,10 +7,12 @@ export default function UpcomingMeetings({
   items,
   isTeacher,
   teacherMap,
+  onOpenMeeting,
 }: {
   items: ScheduleItem[];
   isTeacher: boolean;
   teacherMap: Record<string, string>;
+  onOpenMeeting?: (item: ScheduleItem) => void;
 }) {
   return (
     <div className="bg-card-bg border border-soft-border rounded-2xl shadow-card p-5">
@@ -27,33 +29,44 @@ export default function UpcomingMeetings({
               : `/classes/${item.classId}`;
             const teacherName = item.teacherId ? teacherMap[item.teacherId] : null;
 
+            const rowContent = (
+              <>
+                <div className="w-12 shrink-0 text-center">
+                  <p className="text-xs font-semibold text-primary uppercase tracking-wide">
+                    {date?.toLocaleDateString("en-US", { weekday: "short" }) ?? ""}
+                  </p>
+                  <p className="text-lg font-bold text-dark-text">{date?.getDate() ?? "—"}</p>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-muted-text">{formatTime(item.startTime)}</p>
+                  <p className="text-sm font-semibold text-dark-text truncate">
+                    {item.title ?? item.className}
+                  </p>
+                  {!isTeacher && teacherName && (
+                    <p className="text-xs text-muted-text truncate">with {teacherName}</p>
+                  )}
+                </div>
+                <ChevronRight
+                  size={16}
+                  className="text-muted-text shrink-0"
+                  aria-hidden="true"
+                />
+              </>
+            );
+            const rowCls =
+              "flex items-center gap-3 py-3 -mx-2 px-2 rounded-lg hover:bg-slate-50 transition-colors w-full text-left";
+
             return (
               <li key={item.id}>
-                <Link
-                  href={classHref}
-                  className="flex items-center gap-3 py-3 -mx-2 px-2 rounded-lg hover:bg-slate-50 transition-colors"
-                >
-                  <div className="w-12 shrink-0 text-center">
-                    <p className="text-xs font-semibold text-primary uppercase tracking-wide">
-                      {date?.toLocaleDateString("en-US", { weekday: "short" }) ?? ""}
-                    </p>
-                    <p className="text-lg font-bold text-dark-text">{date?.getDate() ?? "—"}</p>
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs text-muted-text">{formatTime(item.startTime)}</p>
-                    <p className="text-sm font-semibold text-dark-text truncate">
-                      {item.title ?? item.className}
-                    </p>
-                    {!isTeacher && teacherName && (
-                      <p className="text-xs text-muted-text truncate">with {teacherName}</p>
-                    )}
-                  </div>
-                  <ChevronRight
-                    size={16}
-                    className="text-muted-text shrink-0"
-                    aria-hidden="true"
-                  />
-                </Link>
+                {onOpenMeeting ? (
+                  <button type="button" onClick={() => onOpenMeeting(item)} className={rowCls}>
+                    {rowContent}
+                  </button>
+                ) : (
+                  <Link href={classHref} className={rowCls}>
+                    {rowContent}
+                  </Link>
+                )}
               </li>
             );
           })}

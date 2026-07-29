@@ -7,16 +7,23 @@ export default function ScheduleItemCard({
   item,
   isTeacher,
   teacherName,
+  onOpenMeeting,
 }: {
   item: ScheduleItem;
   isTeacher: boolean;
   teacherName?: string | null;
+  /** When provided (student view only), clicking a real meeting's title
+   *  opens the meeting detail modal instead of navigating to the class
+   *  page — schedule-template projections have no real meeting to
+   *  manage, so they keep linking to the class page regardless. */
+  onOpenMeeting?: (item: ScheduleItem) => void;
 }) {
   const isCancelled = item.status === "cancelled";
   const heading = item.title ?? item.className;
   const showClassName = item.title !== null && item.className !== heading;
   const safeLink = isSafeUrl(item.meetingLink) ? item.meetingLink! : null;
   const classHref = isTeacher ? `/teacher/classes/${item.classId}` : `/classes/${item.classId}`;
+  const canOpenMeeting = Boolean(onOpenMeeting) && item.source === "meeting";
 
   return (
     <li
@@ -36,14 +43,26 @@ export default function ScheduleItemCard({
             >
               {formatTime(item.startTime)}
             </span>
-            <Link
-              href={classHref}
-              className={`text-sm font-semibold hover:underline ${
-                isCancelled ? "text-muted-text line-through" : "text-dark-text"
-              }`}
-            >
-              {heading}
-            </Link>
+            {canOpenMeeting ? (
+              <button
+                type="button"
+                onClick={() => onOpenMeeting!(item)}
+                className={`text-sm font-semibold hover:underline text-left ${
+                  isCancelled ? "text-muted-text line-through" : "text-dark-text"
+                }`}
+              >
+                {heading}
+              </button>
+            ) : (
+              <Link
+                href={classHref}
+                className={`text-sm font-semibold hover:underline ${
+                  isCancelled ? "text-muted-text line-through" : "text-dark-text"
+                }`}
+              >
+                {heading}
+              </Link>
+            )}
             {isCancelled && (
               <span className="text-xs font-medium text-red-500 uppercase tracking-wide">
                 Cancelled

@@ -6,8 +6,9 @@ import { parseLocalISODate } from "@/lib/utils";
 import ScheduleCalendar from "./ScheduleCalendar";
 import WeeklyAgenda from "./WeeklyAgenda";
 import UpcomingMeetings from "./UpcomingMeetings";
+import MeetingDetailModal from "./MeetingDetailModal";
 import { getItemsForDate, hasActivityOnDate, getUpcomingMeetings } from "./scheduleItems";
-import type { RawClassSchedule, RawClassMeeting } from "./scheduleItems";
+import type { RawClassSchedule, RawClassMeeting, ScheduleItem } from "./scheduleItems";
 
 function addDays(date: Date, n: number): Date {
   const d = new Date(date);
@@ -47,6 +48,7 @@ export default function ScheduleView({
 
   const [selectedDate, setSelectedDate] = useState(today);
   const [displayedMonth, setDisplayedMonth] = useState(today);
+  const [openMeetingItem, setOpenMeetingItem] = useState<ScheduleItem | null>(null);
 
   const weekStart = useMemo(() => startOfWeekMonday(selectedDate), [selectedDate]);
   const weekEnd = useMemo(() => addDays(weekStart, 6), [weekStart]);
@@ -169,13 +171,29 @@ export default function ScheduleView({
             teacherMap={teacherMap}
             onPrevWeek={goPrevWeek}
             onNextWeek={goNextWeek}
+            onOpenMeeting={isTeacher ? undefined : setOpenMeetingItem}
           />
         </div>
 
         <div className="[grid-area:upcoming]">
-          <UpcomingMeetings items={upcoming} isTeacher={isTeacher} teacherMap={teacherMap} />
+          <UpcomingMeetings
+            items={upcoming}
+            isTeacher={isTeacher}
+            teacherMap={teacherMap}
+            onOpenMeeting={isTeacher ? undefined : setOpenMeetingItem}
+          />
         </div>
       </div>
+
+      {openMeetingItem && (
+        <MeetingDetailModal
+          item={openMeetingItem}
+          teacherName={
+            openMeetingItem.teacherId ? teacherMap[openMeetingItem.teacherId] : null
+          }
+          onClose={() => setOpenMeetingItem(null)}
+        />
+      )}
     </div>
   );
 }

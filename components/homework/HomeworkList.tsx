@@ -155,12 +155,14 @@ export default function HomeworkList({ assignments, isTeacher }: HomeworkListPro
                       >
                         {a.title}
                       </Link>
-                      <Link
-                        href={classHref}
-                        className="text-xs text-primary hover:underline mt-0.5 inline-block"
-                      >
-                        {a.class_name}
-                      </Link>
+                      {a.class_name.trim().toLowerCase() !== a.title.trim().toLowerCase() && (
+                        <Link
+                          href={classHref}
+                          className="text-xs text-primary hover:underline mt-0.5 inline-block"
+                        >
+                          {a.class_name}
+                        </Link>
+                      )}
                     </div>
                     <StatusBadge status={displayStatus} />
                   </div>

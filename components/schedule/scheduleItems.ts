@@ -24,7 +24,7 @@ export type RawClassMeeting = {
   meeting_provider: string | null;
   meeting_link: string | null;
   location: string | null;
-  status: "scheduled" | "completed" | "cancelled";
+  status: "scheduled" | "completed" | "cancelled" | "group_pending_reschedule";
   classes: { name: string; subject: string | null; teacher_id: string } | null;
 };
 
@@ -40,7 +40,7 @@ export type ScheduleItem = {
   endTime: string;
   timezone: string;
   /** null for schedule projections — the recurring template has no status concept */
-  status: "scheduled" | "completed" | "cancelled" | null;
+  status: "scheduled" | "completed" | "cancelled" | "group_pending_reschedule" | null;
   title: string | null;
   location: string | null;
   meetingProvider: string | null;
