@@ -1,4 +1,4 @@
-import { Bell } from "lucide-react";
+import NotificationsBell from "./NotificationsBell";
 
 interface TopBarProps {
   title: string;
@@ -12,13 +12,7 @@ export default function TopBar({ title, initials = "?" }: TopBarProps) {
         {title}
       </h1>
       <div className="flex items-center gap-3">
-        <button
-          type="button"
-          aria-label="Notifications"
-          className="p-2 rounded-xl text-muted-text hover:bg-slate-100 hover:text-dark-text transition-colors"
-        >
-          <Bell size={18} aria-hidden="true" />
-        </button>
+        <NotificationsBell />
         <div
           role="img"
           aria-label="User avatar"

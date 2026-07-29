@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { X, Clock, MapPin, Link as LinkIcon, AlertCircle } from "lucide-react";
+import type { Matcher } from "react-day-picker";
 import { createClient } from "@/lib/supabase/client";
-import { formatTime, isSafeUrl } from "@/lib/utils";
+import { formatTime, isSafeUrl, parseLocalISODate } from "@/lib/utils";
 import DatePicker from "@/components/ui/DatePicker";
 import StatusBadge from "@/components/ui/StatusBadge";
 import type { ScheduleItem } from "./scheduleItems";
@@ -148,6 +149,27 @@ export default function MeetingDetailModal({
   const safeLink = isSafeUrl(item.meetingLink) ? item.meetingLink! : null;
   const heading = item.title ?? item.className;
 
+  // A proposed makeup date can never fall before the original meeting (an
+  // option must start after it ends) or more than 7 days after it (the
+  // same window request_individual_makeup enforces server-side) — greying
+  // these out is a UI convenience only; the RPC is still the source of
+  // truth. Deliberately a `disabled` matcher, never `startMonth`/`endMonth`,
+  // so browsing into later months (e.g. the meeting's date plus a few days
+  // crossing into the next calendar month) is never blocked.
+  const meetingDay = parseLocalISODate(item.date);
+  const optionDateDisabled: Matcher[] | undefined = meetingDay
+    ? [
+        { before: meetingDay },
+        {
+          after: new Date(
+            meetingDay.getFullYear(),
+            meetingDay.getMonth(),
+            meetingDay.getDate() + 7
+          ),
+        },
+      ]
+    : undefined;
+
   function updateOption(index: number, field: keyof OptionDraft, value: string) {
     setOptions((prev) => prev.map((o, i) => (i === index ? { ...o, [field]: value } : o)));
   }
@@ -268,7 +290,11 @@ export default function MeetingDetailModal({
                       <p className="text-xs font-semibold text-muted-text uppercase tracking-wide">
                         Option {i + 1}
                       </p>
-                      <DatePicker value={opt.date} onChange={(v) => updateOption(i, "date", v)} />
+                      <DatePicker
+                        value={opt.date}
+                        onChange={(v) => updateOption(i, "date", v)}
+                        disabled={optionDateDisabled}
+                      />
                       <div className="grid grid-cols-2 gap-2">
                         <input
                           type="time"

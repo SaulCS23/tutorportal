@@ -66,7 +66,11 @@ export default async function TeacherMeetingsPage({ params }: Props) {
     supabase
       .from("group_reschedule_requests")
       .select(
-        "id, threshold_count, eligible_student_count, created_at, class_meetings ( title, start_time, end_time, timezone, meeting_provider, meeting_link, location )"
+        // group_reschedule_requests has two FKs into class_meetings
+        // (meeting_id and replacement_meeting_id) — the embed must name
+        // meeting_id explicitly, or PostgREST rejects the query as an
+        // ambiguous embedding and this section silently comes back empty.
+        "id, threshold_count, eligible_student_count, created_at, class_meetings!meeting_id ( title, start_time, end_time, timezone, meeting_provider, meeting_link, location )"
       )
       .eq("class_id", classId)
       .eq("status", "pending")

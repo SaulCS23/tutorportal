@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { DayPicker } from "react-day-picker";
-import type { ChevronProps, DayButtonProps } from "react-day-picker";
+import type { ChevronProps, DayButtonProps, Matcher } from "react-day-picker";
 import * as Popover from "@radix-ui/react-popover";
 import { Calendar, ChevronLeft, ChevronRight } from "lucide-react";
 import { parseLocalISODate, toLocalISODate } from "@/lib/utils";
@@ -59,9 +59,19 @@ function Chevron({ orientation }: ChevronProps) {
 export default function DatePicker({
   value,
   onChange,
+  disabled,
 }: {
   value: string;
   onChange: (value: string) => void;
+  /**
+   * Marks genuinely invalid dates (e.g. before a minimum date, or outside a
+   * request window) so they render greyed-out and unclickable. Callers must
+   * never reach for `startMonth`/`endMonth` to enforce this instead — those
+   * props cap which months the calendar can even navigate to, which would
+   * silently break forward navigation past a valid month for no reason.
+   * `disabled` only affects individual days; browsing is always unrestricted.
+   */
+  disabled?: Matcher | Matcher[];
 }) {
   const [open, setOpen] = useState(false);
   const selected = parseLocalISODate(value);
@@ -91,6 +101,7 @@ export default function DatePicker({
                 setOpen(false);
               }
             }}
+            disabled={disabled}
             components={{ DayButton, Chevron }}
             classNames={{
               months: "flex flex-col",
