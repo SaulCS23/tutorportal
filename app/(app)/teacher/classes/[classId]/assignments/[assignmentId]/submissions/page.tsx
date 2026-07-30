@@ -1,7 +1,10 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { formatInTimeZone } from "date-fns-tz";
 import { ArrowLeft, User, Clock, CheckCircle, XCircle, BookOpen } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentProfile } from "@/lib/supabase/helpers";
+import { resolveTimeZone } from "@/lib/timezone";
 import StatusBadge from "@/components/ui/StatusBadge";
 import GradeSubmissionForm from "@/components/teacher/submissions/GradeSubmissionForm";
 import type { SubmissionForGrading } from "@/components/teacher/submissions/GradeSubmissionForm";
@@ -45,14 +48,8 @@ type RawSubmission = {
   graded_by: string | null;
 };
 
-function formatDateTime(iso: string) {
-  return new Date(iso).toLocaleString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
+function formatDateTime(iso: string, timeZone: string) {
+  return formatInTimeZone(new Date(iso), timeZone, "MMM d, yyyy, h:mm a");
 }
 
 function submissionBadge(
@@ -70,7 +67,8 @@ function submissionBadge(
 
 export default async function SubmissionsPage({ params }: Props) {
   const { classId, assignmentId } = await params;
-  const supabase = await createClient();
+  const [supabase, profile] = await Promise.all([createClient(), getCurrentProfile()]);
+  const timezone = resolveTimeZone(profile?.timezone);
 
   // Fetch assignment — verify it belongs to this class
   const { data: rawAssignment } = await supabase
@@ -136,7 +134,7 @@ export default async function SubmissionsPage({ params }: Props) {
             </h2>
             <p className="text-xs text-muted-text mt-0.5">
               {assignment.due_at
-                ? `Due ${formatDueDateTime(assignment.due_at)}`
+                ? `Due ${formatDueDateTime(assignment.due_at, timezone)}`
                 : "No due date"}{" "}
               {assignment.points > 0 && `· ${assignment.points} pts`}
             </p>
@@ -209,7 +207,7 @@ export default async function SubmissionsPage({ params }: Props) {
                         {hasSubmission && (
                           <span className="flex items-center gap-1">
                             <Clock size={11} aria-hidden="true" />
-                            Submitted {formatDateTime(sub.submitted_at)}
+                            Submitted {formatDateTime(sub.submitted_at, timezone)}
                           </span>
                         )}
                         {isLate && (

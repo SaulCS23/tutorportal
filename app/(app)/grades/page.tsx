@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { formatInTimeZone } from "date-fns-tz";
 import { Award, BookOpen } from "lucide-react";
 import { getCurrentProfile } from "@/lib/supabase/helpers";
 import { getInitials } from "@/lib/utils";
+import { resolveTimeZone } from "@/lib/timezone";
 import { createClient } from "@/lib/supabase/server";
 import TopBar from "@/components/nav/TopBar";
 
@@ -37,12 +39,8 @@ type GradeItem = {
   status: "graded" | "returned";
 };
 
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+function formatDate(iso: string, timeZone: string) {
+  return formatInTimeZone(new Date(iso), timeZone, "MMM d, yyyy");
 }
 
 function percentage(score: number, maxScore: number): number {
@@ -60,6 +58,7 @@ export default async function GradesPage() {
   const profile = await getCurrentProfile();
   const supabase = await createClient();
   const isTeacher = profile?.role === "teacher";
+  const timezone = resolveTimeZone(profile?.timezone);
 
   if (isTeacher) {
     return (
@@ -199,7 +198,7 @@ export default async function GradesPage() {
                             : "Graded"}{" "}
                           on{" "}
                           <span className="text-dark-text">
-                            {formatDate(g.graded_at)}
+                            {formatDate(g.graded_at, timezone)}
                           </span>
                         </p>
                       )}

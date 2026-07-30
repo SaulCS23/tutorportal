@@ -75,12 +75,15 @@ export type Profile = {
   last_name: string | null;
   full_name: string;
   role: "student" | "teacher";
+  /** IANA zone name, or null if never detected/set — see
+   *  lib/timezone.ts#resolveTimeZone for the fallback used when null. */
+  timezone: string | null;
   created_at: string;
   updated_at: string;
 };
 
 const PROFILE_SELECT =
-  "id, first_name, last_name, full_name, role, created_at, updated_at";
+  "id, first_name, last_name, full_name, role, timezone, created_at, updated_at";
 
 export async function getCurrentUser() {
   const supabase = await createClient();

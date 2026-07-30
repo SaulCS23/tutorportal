@@ -5,10 +5,14 @@ import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { combineDateAndTime } from "@/lib/utils";
+import { useViewerTimezone } from "@/components/timezone/TimezoneProvider";
 import DatePicker from "@/components/ui/DatePicker";
 
 export default function CreateAssignmentForm({ classId }: { classId: string }) {
   const router = useRouter();
+  // The due date/time is interpreted in the creating teacher's own saved
+  // timezone, not the app's hardcoded default — see combineDateAndTime.
+  const viewerTimezone = useViewerTimezone();
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [instructions, setInstructions] = useState("");
@@ -50,7 +54,7 @@ export default function CreateAssignmentForm({ classId }: { classId: string }) {
       class_id: classId,
       title: title.trim(),
       instructions: instructions.trim() || null,
-      due_at: combineDateAndTime(dueDate, dueTime),
+      due_at: combineDateAndTime(dueDate, dueTime, viewerTimezone),
       points: pts,
       status,
     });

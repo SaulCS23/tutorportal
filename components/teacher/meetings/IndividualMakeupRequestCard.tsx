@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { formatTime } from "@/lib/utils";
+import { useViewerTimezone } from "@/components/timezone/TimezoneProvider";
 import { approveMakeupOption, rejectMakeupRequest } from "@/components/schedule/meetingCancellation";
 import type { MakeupOption } from "@/components/schedule/meetingCancellation";
 
@@ -48,6 +49,10 @@ export default function IndividualMakeupRequestCard({
   request: MakeupRequestForReview;
 }) {
   const router = useRouter();
+  // Purely informational — which option the teacher selects is submitted
+  // as an option id, not a re-parsed time, so displaying it in the
+  // viewer's own timezone here has no effect on the approval itself.
+  const viewerTimezone = useViewerTimezone();
   const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [loading, setLoading] = useState(false);
@@ -121,7 +126,7 @@ export default function IndividualMakeupRequestCard({
               className="accent-primary"
             />
             <span>
-              Option {i + 1}: {formatOption(opt, request.meetingTimezone)}
+              Option {i + 1}: {formatOption(opt, viewerTimezone)}
             </span>
           </label>
         ))}

@@ -1,9 +1,18 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { formatInTimeZone } from "date-fns-tz";
 import { ChevronLeft, Users, BookOpen, Megaphone, Clock, Link as LinkIcon } from "lucide-react";
 import { getCurrentProfile } from "@/lib/supabase/helpers";
-import { getInitials, DAY_NAMES, formatTime, isSafeUrl, formatDueDate } from "@/lib/utils";
+import { getInitials, isSafeUrl, formatDueDate } from "@/lib/utils";
+import {
+  resolveTimeZone,
+  nextScheduleOccurrenceDate,
+  getMeetingStartInstant,
+  getMeetingEndInstant,
+  formatZonedTime,
+  formatCalendarDate,
+} from "@/lib/timezone";
 import { createClient } from "@/lib/supabase/server";
 import TopBar from "@/components/nav/TopBar";
 import CopyCodeButton from "@/components/classes/CopyCodeButton";
@@ -80,27 +89,17 @@ type AnnouncementRow = {
   created_at: string;
 };
 
-const formatDate = (iso: string) =>
-  new Date(iso).toLocaleDateString("en-US", {
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  });
+// All three take an absolute instant (ISO) plus the *viewer's* timezone
+// — never the server's runtime zone (Vercel runs in UTC) and never a
+// bare date string reinterpreted without a zone.
+const formatDate = (iso: string, timeZone: string) =>
+  formatInTimeZone(new Date(iso), timeZone, "MMMM d, yyyy");
 
-const formatShortDate = (iso: string) =>
-  new Date(iso).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+const formatShortDate = (iso: string, timeZone: string) =>
+  formatInTimeZone(new Date(iso), timeZone, "MMM d, yyyy");
 
-const formatMeetingDate = (dateStr: string) =>
-  new Date(`${dateStr}T00:00:00`).toLocaleDateString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+const formatMeetingDateLabel = (iso: string, timeZone: string) =>
+  formatInTimeZone(new Date(iso), timeZone, "EEE, MMM d, yyyy");
 
 export default async function ClassDetailPage({ params }: Props) {
   const { id } = await params;
@@ -124,6 +123,7 @@ export default async function ClassDetailPage({ params }: Props) {
   const isOwner =
     profile?.role === "teacher" && typedCls.teacher_id === profile?.id;
   const isStudent = profile?.role === "student";
+  const timezone = resolveTimeZone(profile?.timezone);
 
   const [teacherResult, countResult] = await Promise.all([
     supabase
@@ -253,14 +253,14 @@ export default async function ClassDetailPage({ params }: Props) {
               <div className="flex justify-between gap-4">
                 <dt className="text-muted-text">Start Date</dt>
                 <dd className="font-medium text-dark-text">
-                  {formatDate(typedCls.start_date)}
+                  {formatCalendarDate(typedCls.start_date)}
                 </dd>
               </div>
             )}
             <div className="flex justify-between gap-4">
               <dt className="text-muted-text">Created</dt>
               <dd className="font-medium text-dark-text">
-                {formatDate(typedCls.created_at)}
+                {formatDate(typedCls.created_at, timezone)}
               </dd>
             </div>
           </dl>
@@ -299,6 +299,18 @@ export default async function ClassDetailPage({ params }: Props) {
             <ul className="flex flex-col gap-3" role="list">
               {upcomingMeetings.map((m) => {
                 const safeLink = isSafeUrl(m.meeting_link) ? m.meeting_link! : null;
+                // Absolute instants, converted to the viewer's own
+                // timezone — never the meeting's stored one.
+                const startInstant = getMeetingStartInstant({
+                  meeting_date: m.meeting_date,
+                  start_time: m.start_time,
+                  timezone: m.timezone,
+                });
+                const endInstant = getMeetingEndInstant({
+                  meeting_date: m.meeting_date,
+                  end_time: m.end_time,
+                  timezone: m.timezone,
+                });
                 return (
                   <li
                     key={m.id}
@@ -314,8 +326,10 @@ export default async function ClassDetailPage({ params }: Props) {
                           <StatusBadge status={m.status} />
                         </div>
                         <p className="text-xs text-muted-text mt-0.5">
-                          {formatMeetingDate(m.meeting_date)} · {formatTime(m.start_time)} – {formatTime(m.end_time)}{" "}
-                          <span className="text-slate-400">({m.timezone})</span>
+                          {formatMeetingDateLabel(startInstant.toISOString(), timezone)} ·{" "}
+                          {formatZonedTime(startInstant.toISOString(), timezone)} –{" "}
+                          {formatZonedTime(endInstant.toISOString(), timezone)}{" "}
+                          <span className="text-slate-400">({timezone})</span>
                         </p>
                         {m.meeting_provider && (
                           <p className="text-xs text-muted-text">{m.meeting_provider}</p>
@@ -366,6 +380,20 @@ export default async function ClassDetailPage({ params }: Props) {
             <ul className="flex flex-col gap-3" role="list">
               {schedules.map((s) => {
                 const safeLink = isSafeUrl(s.meeting_link) ? s.meeting_link! : null;
+                // Resolve the next concrete occurrence, then absolute
+                // instants, converted to the viewer's own timezone.
+                const occurrenceDate = nextScheduleOccurrenceDate(s.day_of_week, s.start_time, s.timezone);
+                const startInstant = getMeetingStartInstant({
+                  meeting_date: occurrenceDate,
+                  start_time: s.start_time,
+                  timezone: s.timezone,
+                });
+                const endInstant = getMeetingEndInstant({
+                  meeting_date: occurrenceDate,
+                  end_time: s.end_time,
+                  timezone: s.timezone,
+                });
+                const dayLabel = formatInTimeZone(startInstant, timezone, "EEEE");
                 return (
                   <li
                     key={s.id}
@@ -377,11 +405,12 @@ export default async function ClassDetailPage({ params }: Props) {
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-semibold text-dark-text">
-                          {DAY_NAMES[s.day_of_week]}
+                          {dayLabel}
                         </p>
                         <p className="text-xs text-muted-text mt-0.5">
-                          {formatTime(s.start_time)} – {formatTime(s.end_time)}{" "}
-                          <span className="text-slate-400">({s.timezone})</span>
+                          {formatZonedTime(startInstant.toISOString(), timezone)} –{" "}
+                          {formatZonedTime(endInstant.toISOString(), timezone)}{" "}
+                          <span className="text-slate-400">({timezone})</span>
                         </p>
                         {s.meeting_provider && (
                           <p className="text-xs text-muted-text">{s.meeting_provider}</p>
@@ -458,7 +487,7 @@ export default async function ClassDetailPage({ params }: Props) {
                     <div className="min-w-0">
                       <p className="text-sm font-semibold text-dark-text">{a.title}</p>
                       <p className="text-xs text-amber-600 mt-0.5">
-                        {formatShortDate(a.created_at)}
+                        {formatShortDate(a.created_at, timezone)}
                       </p>
                       <p className="text-sm text-amber-900 leading-relaxed mt-2 whitespace-pre-line">
                         {a.body}
@@ -529,7 +558,7 @@ export default async function ClassDetailPage({ params }: Props) {
                       <span>
                         Due:{" "}
                         <span className="font-medium text-dark-text">
-                          {a.due_at ? formatDueDate(a.due_at) : "No due date"}
+                          {a.due_at ? formatDueDate(a.due_at, timezone) : "No due date"}
                         </span>
                       </span>
                       <span aria-hidden="true">·</span>
@@ -596,7 +625,7 @@ export default async function ClassDetailPage({ params }: Props) {
                         {s.email}
                       </p>
                       <p className="text-xs text-muted-text">
-                        Joined {formatDate(s.joined_at)}
+                        Joined {formatDate(s.joined_at, timezone)}
                       </p>
                     </div>
                     <RemoveStudentButton

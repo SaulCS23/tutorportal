@@ -8,20 +8,16 @@ import {
   Users,
 } from "lucide-react";
 import { getCurrentProfile } from "@/lib/supabase/helpers";
-import {
-  getInitials,
-  findNextSchedule,
-  formatDueDate,
-  todayISODateInTimezone,
-  daysUntilNext,
-  toLocalISODate,
-} from "@/lib/utils";
+import { getInitials, formatDueDate } from "@/lib/utils";
+import { resolveTimeZone } from "@/lib/timezone";
 import { createClient } from "@/lib/supabase/server";
 import { getOwnAttendanceSummary, getTeacherAttendanceAlerts } from "@/lib/attendanceStats";
 import type { AttendanceTally, AttendanceAlert } from "@/lib/attendanceStats";
+import { getNextMeeting } from "@/components/schedule/scheduleItems";
 import TopBar from "@/components/nav/TopBar";
 import SectionHeading from "@/components/ui/SectionHeading";
 import NextMeetingCard from "@/components/dashboard/NextMeetingCard";
+import type { NextMeeting } from "@/components/dashboard/NextMeetingCard";
 import AttendanceSummaryCard from "@/components/dashboard/AttendanceSummaryCard";
 import AttendanceAlertsCard from "@/components/dashboard/AttendanceAlertsCard";
 
@@ -42,10 +38,20 @@ type ScheduleRow = {
   meeting_passcode: string | null;
   location: string | null;
   classes: { name: string; subject: string | null } | null;
-  /** The concrete class_meetings row for this slot's next occurrence, if
-   *  one has been created — see resolveNextMeetingId below. Absent when
-   *  no dated meeting exists yet for that day (pure recurring template). */
-  meetingId?: string | null;
+};
+
+type MeetingRow = {
+  id: string;
+  class_id: string;
+  meeting_date: string;
+  start_time: string;
+  end_time: string;
+  timezone: string;
+  status: "scheduled" | "completed" | "cancelled" | "group_pending_reschedule";
+  meeting_provider: string | null;
+  meeting_link: string | null;
+  location: string | null;
+  classes: { name: string; subject: string | null } | null;
 };
 
 type AssignmentRow = {
@@ -74,33 +80,39 @@ function isOverdue(due_at: string | null) {
 }
 
 /**
- * A concrete, dated class_meetings row shadows the recurring template on
- * the day it occurs (the same "real meeting takes priority" rule
- * scheduleItems.ts#getItemsForDate already applies to the Schedule page)
- * — resolved here too so the dashboard's "Next Meeting" Join button can
- * attribute a click to a real meeting id and actually record attendance,
- * instead of always falling back to the template's own (attendance-less)
- * link. Returns null when no dated meeting exists yet for that occurrence.
+ * A generous, timezone-agnostic lower bound for the class_meetings query
+ * only — never the correctness boundary for "is this meeting upcoming".
+ * getNextMeeting (scheduleItems.ts) applies the real per-meeting absolute
+ * start instant; this just keeps the query from pulling every meeting a
+ * class has ever had. A 2-day margin safely covers any IANA zone's offset
+ * from UTC, so this pre-filter can never accidentally exclude a meeting
+ * that's actually still upcoming. Mirrors attendanceStats.ts#coarseUpperBoundDate.
  */
-async function resolveNextMeetingId(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  schedule: Pick<ScheduleRow, "class_id" | "day_of_week" | "start_time" | "timezone">
-): Promise<string | null> {
-  const offsetDays = daysUntilNext(schedule.day_of_week, schedule.start_time, schedule.timezone);
-  const occursOn = new Date(new Date().toLocaleString("en-US", { timeZone: schedule.timezone }));
-  occursOn.setDate(occursOn.getDate() + offsetDays);
-  const dateISO = toLocalISODate(occursOn);
+function coarseLowerBoundDate(): string {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() - 2);
+  return d.toISOString().slice(0, 10);
+}
 
-  const { data } = await supabase
-    .from("class_meetings")
-    .select("id")
-    .eq("class_id", schedule.class_id)
-    .eq("meeting_date", dateISO)
-    .neq("status", "cancelled")
-    .limit(1)
-    .maybeSingle();
-
-  return (data as { id: string } | null)?.id ?? null;
+/**
+ * Maps the shared next-meeting selection result (scheduleItems.ts#getNextMeeting
+ * — the single definition of "next meeting" also used by the Schedule
+ * page) into the shape NextMeetingCard expects.
+ */
+function toNextMeeting(info: ReturnType<typeof getNextMeeting>): NextMeeting | null {
+  if (!info) return null;
+  return {
+    day_of_week: info.dayOfWeek,
+    start_time: info.startTime,
+    end_time: info.endTime,
+    timezone: info.timezone,
+    meeting_provider: info.meetingProvider,
+    meeting_link: info.meetingLink,
+    location: info.location,
+    classes: { name: info.className, subject: info.subject },
+    meetingId: info.meetingId,
+    date: info.date,
+  };
 }
 
 // ── Page ──────────────────────────────────────────────────────
@@ -110,9 +122,9 @@ export default async function DashboardPage() {
   const firstName = profile?.first_name ?? profile?.full_name?.split(" ")[0] ?? "there";
   const isTeacher = profile?.role === "teacher";
   const initials = getInitials(profile?.first_name, profile?.last_name);
+  const timezone = resolveTimeZone(profile?.timezone);
 
   const supabase = await createClient();
-  const todayISO = todayISODateInTimezone();
 
   // ── Teacher data ──────────────────────────────────────────
   if (isTeacher) {
@@ -120,6 +132,7 @@ export default async function DashboardPage() {
       { count: classCount },
       { count: studentCount },
       { data: rawSchedules },
+      { data: rawMeetings },
       { data: rawAssignments },
       { data: rawAnnouncements },
       attendanceAlerts,
@@ -143,6 +156,13 @@ export default async function DashboardPage() {
         .order("day_of_week")
         .order("start_time"),
       supabase
+        .from("class_meetings")
+        .select(
+          "id, class_id, meeting_date, start_time, end_time, timezone, status, meeting_provider, meeting_link, location, classes ( name, subject )"
+        )
+        .neq("status", "cancelled")
+        .gte("meeting_date", coarseLowerBoundDate()),
+      supabase
         .from("assignments")
         .select("id, title, due_at, points, status, class_id, classes ( name )")
         .order("due_at", { ascending: true, nullsFirst: false })
@@ -152,17 +172,14 @@ export default async function DashboardPage() {
         .select("id, title, body, created_at, classes ( name )")
         .order("created_at", { ascending: false })
         .limit(3),
-      getTeacherAttendanceAlerts(supabase, profile!.id, todayISO),
+      getTeacherAttendanceAlerts(supabase, profile!.id),
     ]);
 
     const schedules = (rawSchedules as unknown as ScheduleRow[]) ?? [];
+    const meetings = (rawMeetings as unknown as MeetingRow[]) ?? [];
     const assignments = (rawAssignments as unknown as AssignmentRow[]) ?? [];
     const announcements = (rawAnnouncements as unknown as AnnouncementRow[]) ?? [];
-    let nextMeeting = findNextSchedule(schedules);
-    if (nextMeeting) {
-      const meetingId = await resolveNextMeetingId(supabase, nextMeeting);
-      nextMeeting = { ...nextMeeting, meetingId };
-    }
+    const nextMeeting = toNextMeeting(getNextMeeting(schedules, meetings));
 
     return (
       <TeacherDashboard
@@ -175,6 +192,7 @@ export default async function DashboardPage() {
         assignments={assignments}
         announcements={announcements}
         attendanceAlerts={attendanceAlerts}
+        timezone={timezone}
         isTeacher
       />
     );
@@ -184,6 +202,7 @@ export default async function DashboardPage() {
   const [
     { count: classCount },
     { data: rawSchedules },
+    { data: rawMeetings },
     { data: rawAssignments },
     { data: rawAnnouncements },
     attendanceSummary,
@@ -200,6 +219,13 @@ export default async function DashboardPage() {
       .order("day_of_week")
       .order("start_time"),
     supabase
+      .from("class_meetings")
+      .select(
+        "id, class_id, meeting_date, start_time, end_time, timezone, status, meeting_provider, meeting_link, location, classes ( name, subject )"
+      )
+      .neq("status", "cancelled")
+      .gte("meeting_date", coarseLowerBoundDate()),
+    supabase
       .from("assignments")
       .select("id, title, due_at, points, status, class_id, classes ( name )")
       .eq("status", "published")
@@ -210,17 +236,14 @@ export default async function DashboardPage() {
       .select("id, title, body, created_at, classes ( name )")
       .order("created_at", { ascending: false })
       .limit(3),
-    getOwnAttendanceSummary(supabase, todayISO),
+    getOwnAttendanceSummary(supabase),
   ]);
 
   const schedules = (rawSchedules as unknown as ScheduleRow[]) ?? [];
+  const meetings = (rawMeetings as unknown as MeetingRow[]) ?? [];
   const assignments = (rawAssignments as unknown as AssignmentRow[]) ?? [];
   const announcements = (rawAnnouncements as unknown as AnnouncementRow[]) ?? [];
-  let nextMeeting = findNextSchedule(schedules);
-  if (nextMeeting) {
-    const meetingId = await resolveNextMeetingId(supabase, nextMeeting);
-    nextMeeting = { ...nextMeeting, meetingId };
-  }
+  const nextMeeting = toNextMeeting(getNextMeeting(schedules, meetings));
   const upcomingCount = assignments.filter((a) => !isOverdue(a.due_at)).length;
 
   return (
@@ -234,6 +257,7 @@ export default async function DashboardPage() {
       assignments={assignments}
       announcements={announcements}
       attendanceSummary={attendanceSummary}
+      timezone={timezone}
     />
   );
 }
@@ -250,6 +274,7 @@ function TeacherDashboard({
   assignments,
   announcements,
   attendanceAlerts,
+  timezone,
   isTeacher,
 }: {
   firstName: string;
@@ -257,10 +282,11 @@ function TeacherDashboard({
   classCount: number;
   studentCount: number;
   scheduleCount: number;
-  nextMeeting: ScheduleRow | null;
+  nextMeeting: NextMeeting | null;
   assignments: AssignmentRow[];
   announcements: AnnouncementRow[];
   attendanceAlerts: AttendanceAlert[];
+  timezone: string;
   isTeacher: boolean;
 }) {
   void isTeacher;
@@ -286,7 +312,7 @@ function TeacherDashboard({
           ) : (
             <ul className="flex flex-col gap-3" role="list">
               {assignments.slice(0, 4).map((a) => (
-                <AssignmentListItem key={a.id} assignment={a} isTeacher />
+                <AssignmentListItem key={a.id} assignment={a} isTeacher timezone={timezone} />
               ))}
             </ul>
           )}
@@ -312,16 +338,18 @@ function StudentDashboard({
   assignments,
   announcements,
   attendanceSummary,
+  timezone,
 }: {
   firstName: string;
   initials: string;
   classCount: number;
   upcomingAssignmentCount: number;
   scheduleCount: number;
-  nextMeeting: ScheduleRow | null;
+  nextMeeting: NextMeeting | null;
   assignments: AssignmentRow[];
   announcements: AnnouncementRow[];
   attendanceSummary: AttendanceTally;
+  timezone: string;
 }) {
   return (
     <div>
@@ -345,7 +373,7 @@ function StudentDashboard({
           ) : (
             <ul className="flex flex-col gap-3" role="list">
               {assignments.slice(0, 4).map((a) => (
-                <AssignmentListItem key={a.id} assignment={a} isTeacher={false} />
+                <AssignmentListItem key={a.id} assignment={a} isTeacher={false} timezone={timezone} />
               ))}
             </ul>
           )}
@@ -406,9 +434,11 @@ function StatCard({
 function AssignmentListItem({
   assignment,
   isTeacher,
+  timezone,
 }: {
   assignment: AssignmentRow;
   isTeacher: boolean;
+  timezone: string;
 }) {
   const overdue =
     !isTeacher && assignment.due_at
@@ -434,7 +464,7 @@ function AssignmentListItem({
             {assignment.title}
           </p>
           <p className="text-xs text-muted-text truncate">
-            {formatDueDate(assignment.due_at)}
+            {formatDueDate(assignment.due_at, timezone)}
           </p>
         </div>
         {isTeacher ? (

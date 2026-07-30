@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowLeft, BookOpen, Clock, Award } from "lucide-react";
 import { getCurrentProfile } from "@/lib/supabase/helpers";
 import { getInitials, formatDueDateTime } from "@/lib/utils";
+import { resolveTimeZone } from "@/lib/timezone";
 import { createClient } from "@/lib/supabase/server";
 import TopBar from "@/components/nav/TopBar";
 import StatusBadge from "@/components/ui/StatusBadge";
@@ -138,7 +139,7 @@ export default async function AssignmentDetailPage({ params }: Props) {
                 <>
                   Due{" "}
                   <span className={`font-medium ${isPastDue ? "text-red-600" : "text-dark-text"}`}>
-                    {formatDueDateTime(assignment.due_at)}
+                    {formatDueDateTime(assignment.due_at, resolveTimeZone(profile.timezone))}
                   </span>
                   {isPastDue && (
                     <span className="ml-1 text-red-500 font-medium">(Past due)</span>

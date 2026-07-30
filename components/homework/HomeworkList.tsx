@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Search, BookOpen } from "lucide-react";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { formatDueDate } from "@/lib/utils";
+import { useViewerTimezone } from "@/components/timezone/TimezoneProvider";
 import { clickableCardProps, stopCardClick, CLICKABLE_CARD_CLASSES } from "@/lib/clickableCard";
 
 export type AssignmentItem = {
@@ -37,6 +38,7 @@ function getDisplayStatus(
 
 export default function HomeworkList({ assignments, isTeacher }: HomeworkListProps) {
   const router = useRouter();
+  const viewerTimezone = useViewerTimezone();
   const [search, setSearch] = useState("");
 
   const filters: { value: FilterStatus; label: string }[] = isTeacher
@@ -171,7 +173,7 @@ export default function HomeworkList({ assignments, isTeacher }: HomeworkListPro
                     <div className="text-xs text-muted-text">
                       Due{" "}
                       <span className="font-medium text-dark-text">
-                        {formatDueDate(a.due_at)}
+                        {formatDueDate(a.due_at, viewerTimezone)}
                       </span>
                       {a.points > 0 && (
                         <span className="ml-2 text-muted-text">

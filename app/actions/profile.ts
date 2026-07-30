@@ -42,3 +42,20 @@ export async function updateNameAction(
   revalidatePath("/account");
   return {};
 }
+
+export async function updateTimezoneAction(
+  timezone: string
+): Promise<{ error?: string }> {
+  const supabase = await createClient();
+
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) return { error: "Not authenticated" };
+
+  const { error: rpcError } = await supabase.rpc("update_own_timezone", {
+    p_timezone: timezone,
+  });
+  if (rpcError) return { error: rpcError.message };
+
+  revalidatePath("/account");
+  return {};
+}

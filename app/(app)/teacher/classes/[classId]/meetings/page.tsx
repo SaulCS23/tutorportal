@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { todayISODateInTimezone } from "@/lib/utils";
+import { DEFAULT_TIMEZONE } from "@/lib/timezone";
 import type { ClassMeeting } from "@/lib/supabase/helpers";
 import CreateMeetingForm from "@/components/teacher/meetings/CreateMeetingForm";
 import MeetingCard from "@/components/teacher/meetings/MeetingCard";
@@ -154,7 +155,7 @@ export default async function TeacherMeetingsPage({ params }: Props) {
     studentName: r.profiles?.full_name ?? "Unknown Student",
     meetingTitle: r.class_meetings?.title ?? "Meeting",
     meetingStartTime: r.class_meetings?.start_time ?? "00:00:00",
-    meetingTimezone: r.class_meetings?.timezone ?? "America/Panama",
+    meetingTimezone: r.class_meetings?.timezone ?? DEFAULT_TIMEZONE,
     options: (optionsByRequest[r.id] ?? []).map((o) => ({
       id: o.id,
       proposed_start_at: o.proposed_start_at,
@@ -167,7 +168,7 @@ export default async function TeacherMeetingsPage({ params }: Props) {
     meetingTitle: r.class_meetings?.title ?? "Meeting",
     meetingStartTime: r.class_meetings?.start_time ?? "00:00:00",
     meetingEndTime: r.class_meetings?.end_time ?? "00:00:00",
-    meetingTimezone: r.class_meetings?.timezone ?? "America/Panama",
+    meetingTimezone: r.class_meetings?.timezone ?? DEFAULT_TIMEZONE,
     meetingProvider: r.class_meetings?.meeting_provider ?? null,
     meetingLink: r.class_meetings?.meeting_link ?? null,
     location: r.class_meetings?.location ?? null,

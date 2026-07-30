@@ -1,12 +1,14 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { effectiveAttendanceStatus, type AttendanceStatus } from "./attendance";
+import { hasMeetingConcluded } from "./timezone";
 
 export type AttendanceTally = {
   present: number;
   late: number;
   absent: number;
   total: number;
-  /** (present + late) / total, 0-100 rounded; 0 when total is 0. */
+  /** (present + late) / total, 0-100 rounded; 0 when total is 0. Late
+   *  counts as attended — see computeAttendanceRate. */
   rate: number;
 };
 
@@ -18,45 +20,144 @@ type RawAttendanceRow = {
 
 const EMPTY_TALLY: AttendanceTally = { present: 0, late: 0, absent: 0, total: 0, rate: 0 };
 
-// Every row passed in here already belongs to a meeting whose
-// meeting_date is before today (see the `lt("meeting_date", todayISO)`
-// filters below) — the same coarse, day-level "has this happened yet"
-// cutoff already used elsewhere in this codebase (e.g. the teacher
-// meetings page's upcoming/past split) — so a missing row always folds
-// to "absent" here, never "pending".
-function tally(rows: RawAttendanceRow[]): AttendanceTally {
+/**
+ * The one shared attendance-rate formula used everywhere in the app —
+ * teacher student records, student attendance history, dashboard
+ * summaries, attendance alerts. Late counts as attended (it only
+ * reduces punctuality, not attendance); Absent does not.
+ */
+export function computeAttendanceRate(present: number, late: number, absent: number): number {
+  const total = present + late + absent;
+  return total > 0 ? Math.round(((present + late) / total) * 100) : 0;
+}
+
+// Takes already-resolved statuses (via effectiveAttendanceStatus), not
+// raw rows — every caller has already filtered its meetings down to
+// ones that have actually concluded (hasMeetingConcluded, an absolute-
+// instant check — see the module-level note on coarseUpperBoundDate
+// below for why the SQL query itself uses a looser bound), so a missing
+// row always resolves to "absent" before it ever reaches this function,
+// never "pending".
+function tally(statuses: AttendanceStatus[]): AttendanceTally {
   let present = 0;
   let late = 0;
   let absent = 0;
-  for (const row of rows) {
-    const status = effectiveAttendanceStatus(row, true);
+  for (const status of statuses) {
     if (status === "present") present++;
     else if (status === "late") late++;
     else if (status === "absent") absent++;
   }
-  const total = present + late + absent;
-  const rate = total > 0 ? Math.round(((present + late) / total) * 100) : 0;
-  return { present, late, absent, total, rate };
+  return { present, late, absent, total: present + late + absent, rate: computeAttendanceRate(present, late, absent) };
 }
 
 /**
- * The current student's own attendance rollup across every concluded,
- * non-cancelled meeting in their enrolled classes. RLS scopes both
- * queries to the caller automatically — no student_id filter needed.
+ * A generous, timezone-agnostic upper bound for the SQL query only —
+ * never the correctness boundary for "has this meeting concluded". The
+ * real decision is hasMeetingConcluded() (lib/timezone.ts), applied per
+ * meeting below using that meeting's own absolute end instant, which is
+ * what correctly includes a meeting that ended earlier today instead of
+ * waiting until the calendar date has fully passed. A 2-day margin
+ * safely covers any IANA zone's offset from UTC in either direction, so
+ * this pre-filter can never accidentally exclude a meeting that should
+ * be considered concluded.
  */
-export async function getOwnAttendanceSummary(
-  supabase: SupabaseClient,
-  todayISO: string
-): Promise<AttendanceTally> {
+function coarseUpperBoundDate(): string {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() + 2);
+  return d.toISOString().slice(0, 10);
+}
+
+/** One concluded meeting's outcome for one student — the shared shape
+ *  behind both the teacher's and student's attendance-history views, so
+ *  neither re-derives status/labels on its own. Always a real
+ *  class_meetings row (never a schedule-template projection). */
+export type AttendanceHistoryEntry = {
+  meetingId: string;
+  classId: string;
+  className: string;
+  title: string;
+  meetingDate: string;
+  startTime: string;
+  endTime: string;
+  timezone: string;
+  meetingStatus: "scheduled" | "completed" | "group_pending_reschedule";
+  meetingProvider: string | null;
+  meetingLink: string | null;
+  location: string | null;
+  status: AttendanceStatus;
+  joinedAt: string | null;
+  overridden: boolean;
+};
+
+type RawMeetingRow = {
+  id: string;
+  class_id: string;
+  title: string;
+  meeting_date: string;
+  start_time: string;
+  end_time: string;
+  timezone: string;
+  status: "scheduled" | "completed" | "group_pending_reschedule";
+  meeting_provider: string | null;
+  meeting_link: string | null;
+  location: string | null;
+  restricted_to_student_id?: string | null;
+  classes: { name: string } | null;
+};
+
+/** Precondition: `meeting` has already been confirmed concluded via
+ *  hasMeetingConcluded — every caller filters for that before mapping. */
+function toHistoryEntry(
+  meeting: RawMeetingRow,
+  record: (RawAttendanceRow & { meeting_id?: string; student_id?: string }) | undefined
+): AttendanceHistoryEntry {
+  return {
+    meetingId: meeting.id,
+    classId: meeting.class_id,
+    className: meeting.classes?.name ?? "Class",
+    title: meeting.title,
+    meetingDate: meeting.meeting_date,
+    startTime: meeting.start_time,
+    endTime: meeting.end_time,
+    timezone: meeting.timezone,
+    meetingStatus: meeting.status,
+    meetingProvider: meeting.meeting_provider,
+    meetingLink: meeting.meeting_link,
+    location: meeting.location,
+    status: effectiveAttendanceStatus(record, true),
+    joinedAt: record?.joined_at ?? null,
+    overridden: record?.attendance_overridden ?? false,
+  };
+}
+
+const MEETING_HISTORY_SELECT =
+  "id, class_id, title, meeting_date, start_time, end_time, timezone, status, meeting_provider, meeting_link, location, restricted_to_student_id, classes ( name )";
+
+/**
+ * The current student's own attendance summary + chronological history
+ * (newest first) across every concluded, non-cancelled meeting in their
+ * enrolled classes. RLS scopes both queries to the caller automatically
+ * — no student_id filter needed. The single shared query behind both
+ * getOwnAttendanceSummary (below) and the student's account-page history.
+ */
+export async function getOwnAttendanceHistory(
+  supabase: SupabaseClient
+): Promise<{ tally: AttendanceTally; history: AttendanceHistoryEntry[] }> {
   const { data: meetings } = await supabase
     .from("class_meetings")
-    .select("id")
+    .select(MEETING_HISTORY_SELECT)
     .neq("status", "cancelled")
-    .lt("meeting_date", todayISO);
+    .lte("meeting_date", coarseUpperBoundDate())
+    .order("meeting_date", { ascending: false })
+    .order("start_time", { ascending: false });
 
-  const meetingIds = ((meetings as { id: string }[] | null) ?? []).map((m) => m.id);
-  if (meetingIds.length === 0) return EMPTY_TALLY;
+  const now = new Date();
+  const meetingRows = ((meetings as unknown as RawMeetingRow[] | null) ?? []).filter((m) =>
+    hasMeetingConcluded(m, now)
+  );
+  if (meetingRows.length === 0) return { tally: EMPTY_TALLY, history: [] };
 
+  const meetingIds = meetingRows.map((m) => m.id);
   const { data: records } = await supabase
     .from("class_meeting_attendance")
     .select("meeting_id, attendance_status, joined_at, attendance_overridden")
@@ -69,11 +170,82 @@ export async function getOwnAttendanceSummary(
     ])
   );
 
-  const rows: RawAttendanceRow[] = meetingIds.map(
-    (id) =>
-      byMeeting.get(id) ?? { attendance_status: "pending", joined_at: null, attendance_overridden: false }
+  const history = meetingRows.map((m) => toHistoryEntry(m, byMeeting.get(m.id)));
+  return { tally: tally(history.map((h) => h.status)), history };
+}
+
+/**
+ * The current student's own attendance rollup — a thin wrapper around
+ * getOwnAttendanceHistory so the dashboard's summary card and the
+ * account page's full history both come from the same single query
+ * shape instead of two independent ones.
+ */
+export async function getOwnAttendanceSummary(supabase: SupabaseClient): Promise<AttendanceTally> {
+  const { tally: t } = await getOwnAttendanceHistory(supabase);
+  return t;
+}
+
+export type StudentAttendanceRecord = {
+  studentId: string;
+  tally: AttendanceTally;
+  history: AttendanceHistoryEntry[];
+};
+
+/**
+ * Every enrolled student's attendance summary + chronological history
+ * (newest first) for one class, across every concluded, non-cancelled
+ * meeting — the teacher-facing counterpart to getOwnAttendanceHistory,
+ * scoped to a single class (unlike getTeacherAttendanceAlerts, which
+ * intentionally rolls a student's attendance up across every class the
+ * teacher teaches for the dashboard's alert list — a different
+ * aggregation than a single class's roster view needs, so kept separate
+ * rather than forced into one shared function).
+ */
+export async function getClassAttendanceHistory(
+  supabase: SupabaseClient,
+  classId: string
+): Promise<StudentAttendanceRecord[]> {
+  const [{ data: meetings }, { data: members }] = await Promise.all([
+    supabase
+      .from("class_meetings")
+      .select(MEETING_HISTORY_SELECT)
+      .eq("class_id", classId)
+      .neq("status", "cancelled")
+      .lte("meeting_date", coarseUpperBoundDate())
+      .order("meeting_date", { ascending: false })
+      .order("start_time", { ascending: false }),
+    supabase.from("class_members").select("student_id").eq("class_id", classId),
+  ]);
+
+  const now = new Date();
+  const meetingRows = ((meetings as unknown as RawMeetingRow[] | null) ?? []).filter((m) =>
+    hasMeetingConcluded(m, now)
   );
-  return tally(rows);
+  const studentIds = ((members as { student_id: string }[] | null) ?? []).map((m) => m.student_id);
+  if (studentIds.length === 0) return [];
+  if (meetingRows.length === 0) {
+    return studentIds.map((studentId) => ({ studentId, tally: EMPTY_TALLY, history: [] }));
+  }
+
+  const meetingIds = meetingRows.map((m) => m.id);
+  const { data: records } = await supabase
+    .from("class_meeting_attendance")
+    .select("meeting_id, student_id, attendance_status, joined_at, attendance_overridden")
+    .in("meeting_id", meetingIds);
+
+  const recordKey = (meetingId: string, studentId: string) => `${meetingId}:${studentId}`;
+  const recordMap = new Map(
+    ((records as (RawAttendanceRow & { meeting_id: string; student_id: string })[] | null) ?? []).map(
+      (r) => [recordKey(r.meeting_id, r.student_id), r]
+    )
+  );
+
+  return studentIds.map((studentId) => {
+    const history = meetingRows
+      .filter((m) => !m.restricted_to_student_id || m.restricted_to_student_id === studentId)
+      .map((m) => toHistoryEntry(m, recordMap.get(recordKey(m.id, studentId))));
+    return { studentId, tally: tally(history.map((h) => h.status)), history };
+  });
 }
 
 export type AttendanceAlert = {
@@ -91,7 +263,6 @@ export type AttendanceAlert = {
 export async function getTeacherAttendanceAlerts(
   supabase: SupabaseClient,
   teacherId: string,
-  todayISO: string,
   thresholdRate = 80
 ): Promise<AttendanceAlert[]> {
   const { data: classes } = await supabase.from("classes").select("id").eq("teacher_id", teacherId);
@@ -101,18 +272,29 @@ export async function getTeacherAttendanceAlerts(
   const [{ data: meetings }, { data: members }] = await Promise.all([
     supabase
       .from("class_meetings")
-      .select("id, class_id, restricted_to_student_id")
+      .select("id, class_id, meeting_date, end_time, timezone, restricted_to_student_id")
       .in("class_id", classIds)
       .neq("status", "cancelled")
-      .lt("meeting_date", todayISO),
+      .lte("meeting_date", coarseUpperBoundDate()),
     supabase
       .from("class_members")
       .select("class_id, student_id, profiles ( full_name )")
       .in("class_id", classIds),
   ]);
 
-  const meetingRows =
-    (meetings as { id: string; class_id: string; restricted_to_student_id: string | null }[] | null) ?? [];
+  const now = new Date();
+  const meetingRows = (
+    (meetings as
+      | {
+          id: string;
+          class_id: string;
+          meeting_date: string;
+          end_time: string;
+          timezone: string;
+          restricted_to_student_id: string | null;
+        }[]
+      | null) ?? []
+  ).filter((m) => hasMeetingConcluded(m, now));
   if (meetingRows.length === 0) return [];
 
   const meetingIds = meetingRows.map((m) => m.id);
@@ -138,7 +320,7 @@ export async function getTeacherAttendanceAlerts(
     membersByClass.set(m.class_id, list);
   }
 
-  const rowsByStudent = new Map<string, RawAttendanceRow[]>();
+  const statusesByStudent = new Map<string, AttendanceStatus[]>();
   const nameByStudent = new Map<string, string>();
 
   for (const meeting of meetingRows) {
@@ -149,20 +331,16 @@ export async function getTeacherAttendanceAlerts(
 
     for (const student of relevant) {
       nameByStudent.set(student.student_id, student.full_name);
-      const record = recordMap.get(recordKey(meeting.id, student.student_id)) ?? {
-        attendance_status: "pending" as AttendanceStatus,
-        joined_at: null,
-        attendance_overridden: false,
-      };
-      const list = rowsByStudent.get(student.student_id) ?? [];
-      list.push(record);
-      rowsByStudent.set(student.student_id, list);
+      const record = recordMap.get(recordKey(meeting.id, student.student_id));
+      const list = statusesByStudent.get(student.student_id) ?? [];
+      list.push(effectiveAttendanceStatus(record, true));
+      statusesByStudent.set(student.student_id, list);
     }
   }
 
   const alerts: AttendanceAlert[] = [];
-  for (const [studentId, rows] of rowsByStudent) {
-    const t = tally(rows);
+  for (const [studentId, statuses] of statusesByStudent) {
+    const t = tally(statuses);
     if (t.total > 0 && t.rate < thresholdRate) {
       alerts.push({ studentId, name: nameByStudent.get(studentId) ?? "Unknown Student", tally: t });
     }

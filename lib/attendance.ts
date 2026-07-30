@@ -13,6 +13,34 @@ export type AttendanceRecord = {
 const ATTENDANCE_SELECT =
   "student_id, attendance_status, joined_at, attendance_overridden, attendance_updated_by";
 
+/** Shared label/color for every attendance-status badge in the app —
+ *  AttendanceSection, AttendanceHistoryList, and the teacher/student
+ *  history views all render from these instead of each defining their
+ *  own copy. */
+export const ATTENDANCE_STATUS_LABEL: Record<AttendanceStatus, string> = {
+  pending: "Pending",
+  present: "Present",
+  late: "Late",
+  absent: "Absent",
+};
+
+export const ATTENDANCE_STATUS_CLASSES: Record<AttendanceStatus, string> = {
+  pending: "bg-slate-100 text-slate-600",
+  present: "bg-green-50 text-green-700 ring-1 ring-green-200",
+  late: "bg-orange-50 text-orange-700 ring-1 ring-orange-200",
+  absent: "bg-red-50 text-red-600 ring-1 ring-red-200",
+};
+
+/** Formats a joined_at timestamptz as a time-of-day in the meeting's own
+ *  timezone — the one place this conversion happens. */
+export function formatJoinedAt(iso: string, timezone: string): string {
+  return new Date(iso).toLocaleTimeString("en-US", {
+    timeZone: timezone,
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 /**
  * The status to actually display or count. An override always wins; a
  * recorded join is already exactly present/late (computed server-side

@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Copy, Check, ExternalLink } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { TIMEZONE_OPTIONS } from "@/lib/timezone";
+import { useViewerTimezone } from "@/components/timezone/TimezoneProvider";
 
 type CreatedClass = { class_id: string; join_code: string };
 type ViewState = "idle" | "form" | "success";
@@ -16,19 +18,6 @@ const DAY_OPTIONS = [
   { value: 4, label: "Thursday" },
   { value: 5, label: "Friday" },
   { value: 6, label: "Saturday" },
-];
-
-const TIMEZONE_OPTIONS = [
-  { value: "America/Panama", label: "America/Panama (UTC-5)" },
-  { value: "America/New_York", label: "America/New_York" },
-  { value: "America/Chicago", label: "America/Chicago" },
-  { value: "America/Denver", label: "America/Denver" },
-  { value: "America/Los_Angeles", label: "America/Los_Angeles" },
-  { value: "America/Bogota", label: "America/Bogota" },
-  { value: "America/Lima", label: "America/Lima" },
-  { value: "Europe/London", label: "Europe/London" },
-  { value: "Europe/Madrid", label: "Europe/Madrid" },
-  { value: "UTC", label: "UTC" },
 ];
 
 const inputCls =
@@ -89,6 +78,7 @@ function Field({
 
 export default function CreateClassForm() {
   const router = useRouter();
+  const viewerTimezone = useViewerTimezone();
   const [view, setView] = useState<ViewState>("idle");
 
   // Basic info
@@ -99,7 +89,7 @@ export default function CreateClassForm() {
 
   // Schedule
   const [dayOfWeek, setDayOfWeek] = useState("1");
-  const [timezone, setTimezone] = useState("America/Panama");
+  const [timezone, setTimezone] = useState(viewerTimezone);
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
 
@@ -119,7 +109,7 @@ export default function CreateClassForm() {
     setDescription("");
     setStartDate("");
     setDayOfWeek("1");
-    setTimezone("America/Panama");
+    setTimezone(viewerTimezone);
     setStartTime("");
     setEndTime("");
     setMeetLink("");

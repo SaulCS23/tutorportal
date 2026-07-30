@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { formatInTimeZone } from "date-fns-tz";
 import { Megaphone, Pencil, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { useViewerTimezone } from "@/components/timezone/TimezoneProvider";
 import DeleteAnnouncementButton from "./DeleteAnnouncementButton";
 
 export type Announcement = {
@@ -14,19 +16,14 @@ export type Announcement = {
   updated_at: string;
 };
 
-const formatDate = (iso: string) =>
-  new Date(iso).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-
 export default function AnnouncementCard({
   announcement,
 }: {
   announcement: Announcement;
 }) {
   const router = useRouter();
+  const viewerTimezone = useViewerTimezone();
+  const formatDate = (iso: string) => formatInTimeZone(new Date(iso), viewerTimezone, "MMM d, yyyy");
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(announcement.title);
   const [body, setBody] = useState(announcement.body);

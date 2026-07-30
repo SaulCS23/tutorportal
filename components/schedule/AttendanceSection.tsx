@@ -2,57 +2,41 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { useViewerTimezone } from "@/components/timezone/TimezoneProvider";
 import {
   getOwnAttendance,
   getMeetingAttendance,
   setMeetingAttendance,
   getMeetingEndsAt,
   effectiveAttendanceStatus,
+  formatJoinedAt,
+  ATTENDANCE_STATUS_LABEL as STATUS_LABEL,
+  ATTENDANCE_STATUS_CLASSES as STATUS_CLASSES,
   type AttendanceRecord,
   type AttendanceStatus,
 } from "@/lib/attendance";
 
-const STATUS_LABEL: Record<AttendanceStatus, string> = {
-  pending: "Pending",
-  present: "Present",
-  late: "Late",
-  absent: "Absent",
-};
-
-const STATUS_CLASSES: Record<AttendanceStatus, string> = {
-  pending: "bg-slate-100 text-slate-600",
-  present: "bg-green-50 text-green-700 ring-1 ring-green-200",
-  late: "bg-orange-50 text-orange-700 ring-1 ring-orange-200",
-  absent: "bg-red-50 text-red-600 ring-1 ring-red-200",
-};
-
 const OVERRIDE_OPTIONS: Exclude<AttendanceStatus, "pending">[] = ["present", "late", "absent"];
-
-function formatJoinedAt(iso: string, timezone: string) {
-  return new Date(iso).toLocaleTimeString("en-US", {
-    timeZone: timezone,
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
 
 type RosterEntry = { studentId: string; name: string; record: AttendanceRecord | null };
 
 export default function AttendanceSection({
   meetingId,
   classId,
-  timezone,
   isTeacher,
   refreshKey,
 }: {
   meetingId: string;
   classId: string;
-  timezone: string;
   isTeacher: boolean;
   /** Bump this (e.g. after a successful Join) to force a refetch without
    *  remounting the section — see JoinMeetingLink's onJoined. */
   refreshKey?: number;
 }) {
+  // joined_at is always shown in the current viewer's own timezone, not
+  // the meeting's — a Denver teacher and a Panama student reviewing the
+  // same join see their own local clock time (requirement 9).
+  const viewerTimezone = useViewerTimezone();
   const [loading, setLoading] = useState(true);
   const [meetingHasEnded, setMeetingHasEnded] = useState(false);
   const [ownRecord, setOwnRecord] = useState<AttendanceRecord | null>(null);
@@ -200,7 +184,7 @@ export default function AttendanceSection({
               )}
               <p className="text-xs text-muted-text">
                 {entry.record?.joined_at
-                  ? `Student joined: ${formatJoinedAt(entry.record.joined_at, timezone)}`
+                  ? `Student joined: ${formatJoinedAt(entry.record.joined_at, viewerTimezone)}`
                   : "Student never joined through TutorPortal."}
               </p>
               <div

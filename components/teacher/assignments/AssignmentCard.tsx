@@ -6,6 +6,7 @@ import Link from "next/link";
 import { BookOpen, Pencil, X, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { combineDateAndTime, splitDateAndTime, formatDueDate } from "@/lib/utils";
+import { useViewerTimezone } from "@/components/timezone/TimezoneProvider";
 import DatePicker from "@/components/ui/DatePicker";
 import DeleteAssignmentButton from "./DeleteAssignmentButton";
 import AssignmentFileManager from "./AssignmentFileManager";
@@ -30,10 +31,14 @@ export default function AssignmentCard({
   classId: string;
 }) {
   const router = useRouter();
+  // The teacher editing is the "creator" for the purposes of this save —
+  // due-date fields are read from and written to due_at using their own
+  // saved timezone, consistently in both directions.
+  const viewerTimezone = useViewerTimezone();
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(assignment.title);
   const [instructions, setInstructions] = useState(assignment.instructions ?? "");
-  const initialDueAt = assignment.due_at ? splitDateAndTime(assignment.due_at) : null;
+  const initialDueAt = assignment.due_at ? splitDateAndTime(assignment.due_at, viewerTimezone) : null;
   const [dueDate, setDueDate] = useState(initialDueAt?.date ?? "");
   const [dueTime, setDueTime] = useState(initialDueAt?.time ?? "");
   const [points, setPoints] = useState(String(assignment.points));
@@ -44,7 +49,7 @@ export default function AssignmentCard({
   function cancelEdit() {
     setTitle(assignment.title);
     setInstructions(assignment.instructions ?? "");
-    const reset = assignment.due_at ? splitDateAndTime(assignment.due_at) : null;
+    const reset = assignment.due_at ? splitDateAndTime(assignment.due_at, viewerTimezone) : null;
     setDueDate(reset?.date ?? "");
     setDueTime(reset?.time ?? "");
     setPoints(String(assignment.points));
@@ -67,7 +72,7 @@ export default function AssignmentCard({
       .update({
         title: title.trim(),
         instructions: instructions.trim() || null,
-        due_at: combineDateAndTime(dueDate, dueTime),
+        due_at: combineDateAndTime(dueDate, dueTime, viewerTimezone),
         points: pts,
         status,
       })
@@ -112,7 +117,7 @@ export default function AssignmentCard({
           </div>
           <p className="text-xs text-muted-text mt-0.5">
             {assignment.due_at
-              ? `Due ${formatDueDate(assignment.due_at)}`
+              ? `Due ${formatDueDate(assignment.due_at, viewerTimezone)}`
               : "No due date"}{" "}
             · {assignment.points} pts
           </p>

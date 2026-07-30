@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Send, FileText, CheckCircle, Lock, Upload, Download, Trash2, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { formatInTimeZone } from "date-fns-tz";
+import { useViewerTimezone } from "@/components/timezone/TimezoneProvider";
 import {
   buildStoragePath,
   uploadFile,
@@ -41,16 +43,6 @@ interface SubmissionFormProps {
 const inputCls =
   "w-full px-3.5 py-2.5 text-sm bg-page-bg border border-soft-border rounded-xl text-dark-text placeholder:text-muted-text focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition";
 
-function formatDateTime(iso: string) {
-  return new Date(iso).toLocaleString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
-
 export default function SubmissionForm({
   assignmentId,
   existingSubmission,
@@ -58,6 +50,8 @@ export default function SubmissionForm({
   maxPoints,
 }: SubmissionFormProps) {
   const router = useRouter();
+  const viewerTimezone = useViewerTimezone();
+  const formatDateTime = (iso: string) => formatInTimeZone(new Date(iso), viewerTimezone, "MMM d, yyyy, h:mm a");
   const isPastDue = dueAt ? new Date(dueAt) < new Date() : false;
   const isGraded =
     existingSubmission?.status === "graded" ||

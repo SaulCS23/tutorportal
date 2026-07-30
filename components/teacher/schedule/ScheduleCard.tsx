@@ -2,9 +2,18 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { formatInTimeZone } from "date-fns-tz";
 import { Clock, Pencil, X, Link as LinkIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { DAY_NAMES, formatTime, isSafeUrl } from "@/lib/utils";
+import { isSafeUrl } from "@/lib/utils";
+import {
+  TIMEZONE_OPTIONS,
+  nextScheduleOccurrenceDate,
+  getMeetingStartInstant,
+  getMeetingEndInstant,
+  formatZonedTime,
+} from "@/lib/timezone";
+import { useViewerTimezone } from "@/components/timezone/TimezoneProvider";
 import CopyButton from "@/components/ui/CopyButton";
 import DeleteScheduleButton from "./DeleteScheduleButton";
 import type { ClassSchedule } from "@/lib/supabase/helpers";
@@ -27,24 +36,12 @@ const PROVIDER_OPTIONS = [
   { value: "In person", label: "In person" },
 ];
 
-const TIMEZONE_OPTIONS = [
-  { value: "America/Panama", label: "America/Panama (UTC-5)" },
-  { value: "America/New_York", label: "America/New_York" },
-  { value: "America/Chicago", label: "America/Chicago" },
-  { value: "America/Denver", label: "America/Denver" },
-  { value: "America/Los_Angeles", label: "America/Los_Angeles" },
-  { value: "America/Bogota", label: "America/Bogota" },
-  { value: "America/Lima", label: "America/Lima" },
-  { value: "Europe/London", label: "Europe/London" },
-  { value: "Europe/Madrid", label: "Europe/Madrid" },
-  { value: "UTC", label: "UTC" },
-];
-
 const inputCls =
   "w-full px-3.5 py-2.5 text-sm bg-page-bg border border-soft-border rounded-xl text-dark-text placeholder:text-muted-text focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition";
 
 export default function ScheduleCard({ schedule }: { schedule: ClassSchedule }) {
   const router = useRouter();
+  const viewerTimezone = useViewerTimezone();
   const [editing, setEditing] = useState(false);
 
   // Edit form state — initialised from the current schedule
@@ -128,6 +125,24 @@ export default function ScheduleCard({ schedule }: { schedule: ClassSchedule }) 
   const isInPerson = (editing ? provider : schedule.meeting_provider) === "In person";
   const safeLink = isSafeUrl(schedule.meeting_link) ? schedule.meeting_link! : null;
 
+  // Resolve the next concrete occurrence of this recurring slot, then its
+  // absolute start/end instants, so the displayed day name and time are
+  // both derived from the same instant and shown in the viewer's own
+  // timezone — never the raw stored day_of_week/start_time/timezone.
+  const occurrenceDate = nextScheduleOccurrenceDate(schedule.day_of_week, schedule.start_time, schedule.timezone);
+  const startInstant = getMeetingStartInstant({
+    meeting_date: occurrenceDate,
+    start_time: schedule.start_time,
+    timezone: schedule.timezone,
+  });
+  const endInstant = getMeetingEndInstant({
+    meeting_date: occurrenceDate,
+    end_time: schedule.end_time,
+    timezone: schedule.timezone,
+  });
+  const dayLabel = formatInTimeZone(startInstant, viewerTimezone, "EEEE");
+  const timeRangeLabel = `${formatZonedTime(startInstant.toISOString(), viewerTimezone)} – ${formatZonedTime(endInstant.toISOString(), viewerTimezone)}`;
+
   return (
     <div className="bg-card-bg border border-soft-border rounded-2xl shadow-card overflow-hidden">
       {/* Header (always visible) */}
@@ -137,11 +152,10 @@ export default function ScheduleCard({ schedule }: { schedule: ClassSchedule }) 
         </div>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-dark-text">
-            {DAY_NAMES[schedule.day_of_week]}
+            {dayLabel}
           </p>
           <p className="text-xs text-muted-text mt-0.5">
-            {formatTime(schedule.start_time)} – {formatTime(schedule.end_time)}{" "}
-            <span className="text-slate-400">({schedule.timezone})</span>
+            {timeRangeLabel} <span className="text-slate-400">({viewerTimezone})</span>
           </p>
           {schedule.meeting_provider && (
             <p className="text-xs text-muted-text mt-0.5">{schedule.meeting_provider}</p>

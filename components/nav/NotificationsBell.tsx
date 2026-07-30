@@ -3,8 +3,10 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import * as Popover from "@radix-ui/react-popover";
+import { formatInTimeZone } from "date-fns-tz";
 import { Bell, CheckCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { useViewerTimezone } from "@/components/timezone/TimezoneProvider";
 import {
   getNotifications,
   markNotificationRead,
@@ -12,7 +14,11 @@ import {
   type Notification,
 } from "./notifications";
 
-function formatRelativeTime(iso: string): string {
+// The relative math (minutes/hours/days) is a pure epoch diff, always
+// timezone-agnostic and correct as-is. Only the fallback absolute date
+// (7+ days old) needs a timezone — the viewer's own, not the browser's
+// ambient one, which isn't guaranteed to match their saved preference.
+function formatRelativeTime(iso: string, timeZone: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
   const minutes = Math.floor(diffMs / 60_000);
   if (minutes < 1) return "just now";
@@ -21,11 +27,12 @@ function formatRelativeTime(iso: string): string {
   if (hours < 24) return `${hours}h ago`;
   const days = Math.floor(hours / 24);
   if (days < 7) return `${days}d ago`;
-  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  return formatInTimeZone(new Date(iso), timeZone, "MMM d");
 }
 
 export default function NotificationsBell() {
   const router = useRouter();
+  const viewerTimezone = useViewerTimezone();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -140,7 +147,7 @@ export default function NotificationsBell() {
                             <p className="text-xs text-muted-text mt-0.5 line-clamp-2">{n.body}</p>
                           )}
                           <p className="text-xs text-slate-400 mt-1">
-                            {formatRelativeTime(n.created_at)}
+                            {formatRelativeTime(n.created_at, viewerTimezone)}
                           </p>
                         </div>
                       </div>

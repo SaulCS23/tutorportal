@@ -2,9 +2,17 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { formatInTimeZone } from "date-fns-tz";
 import { CalendarDays, Pencil, X, Link as LinkIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { formatTime, isSafeUrl } from "@/lib/utils";
+import { isSafeUrl } from "@/lib/utils";
+import {
+  TIMEZONE_OPTIONS,
+  getMeetingStartInstant,
+  getMeetingEndInstant,
+  formatZonedTime,
+} from "@/lib/timezone";
+import { useViewerTimezone } from "@/components/timezone/TimezoneProvider";
 import type { ClassMeeting } from "@/lib/supabase/helpers";
 import StatusBadge from "@/components/ui/StatusBadge";
 import DatePicker from "@/components/ui/DatePicker";
@@ -21,32 +29,12 @@ const PROVIDER_OPTIONS = [
   { value: "In person", label: "In person" },
 ];
 
-const TIMEZONE_OPTIONS = [
-  { value: "America/Panama", label: "America/Panama (UTC-5)" },
-  { value: "America/New_York", label: "America/New_York" },
-  { value: "America/Chicago", label: "America/Chicago" },
-  { value: "America/Denver", label: "America/Denver" },
-  { value: "America/Los_Angeles", label: "America/Los_Angeles" },
-  { value: "America/Bogota", label: "America/Bogota" },
-  { value: "America/Lima", label: "America/Lima" },
-  { value: "Europe/London", label: "Europe/London" },
-  { value: "Europe/Madrid", label: "Europe/Madrid" },
-  { value: "UTC", label: "UTC" },
-];
-
 const inputCls =
   "w-full px-3.5 py-2.5 text-sm bg-page-bg border border-soft-border rounded-xl text-dark-text placeholder:text-muted-text focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition";
 
-const formatDate = (dateStr: string) =>
-  new Date(`${dateStr}T00:00:00`).toLocaleDateString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-
 export default function MeetingCard({ meeting }: { meeting: ClassMeeting }) {
   const router = useRouter();
+  const viewerTimezone = useViewerTimezone();
   const [editing, setEditing] = useState(false);
   const [showDetail, setShowDetail] = useState(false);
 
@@ -150,6 +138,14 @@ export default function MeetingCard({ meeting }: { meeting: ClassMeeting }) {
     ? {}
     : clickableCardProps(() => setShowDetail(true), `Open meeting details: ${meeting.title}`);
 
+  // Absolute instants, formatted in the viewer's own timezone — never
+  // the meeting's stored one, even for the teacher who created it (they
+  // might be viewing from a different device/timezone setting now).
+  const startInstant = getMeetingStartInstant(meeting);
+  const endInstant = getMeetingEndInstant(meeting);
+  const dateLabel = formatInTimeZone(startInstant, viewerTimezone, "EEE, MMM d, yyyy");
+  const timeRangeLabel = `${formatZonedTime(startInstant.toISOString(), viewerTimezone)} – ${formatZonedTime(endInstant.toISOString(), viewerTimezone)}`;
+
   return (
     <>
     <div
@@ -169,8 +165,7 @@ export default function MeetingCard({ meeting }: { meeting: ClassMeeting }) {
             <StatusBadge status={meeting.status} />
           </div>
           <p className="text-xs text-muted-text mt-0.5">
-            {formatDate(meeting.meeting_date)} · {formatTime(meeting.start_time)} – {formatTime(meeting.end_time)}{" "}
-            <span className="text-slate-400">({meeting.timezone})</span>
+            {dateLabel} · {timeRangeLabel} <span className="text-slate-400">({viewerTimezone})</span>
           </p>
           {meeting.meeting_provider && (
             <p className="text-xs text-muted-text mt-0.5">{meeting.meeting_provider}</p>

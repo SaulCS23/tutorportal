@@ -1,9 +1,15 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { formatInTimeZone } from "date-fns-tz";
 import { getCurrentUser, getCurrentProfile } from "@/lib/supabase/helpers";
 import { getInitials } from "@/lib/utils";
+import { resolveTimeZone } from "@/lib/timezone";
+import { createClient } from "@/lib/supabase/server";
+import { getOwnAttendanceHistory } from "@/lib/attendanceStats";
 import TopBar from "@/components/nav/TopBar";
 import AccountForm from "@/components/account/AccountForm";
+import TimezoneForm from "@/components/account/TimezoneForm";
+import AttendanceHistoryList from "@/components/schedule/AttendanceHistoryList";
 
 export const metadata: Metadata = { title: "Account" };
 
@@ -14,6 +20,14 @@ export default async function AccountPage() {
   ]);
 
   if (!user) redirect("/login");
+
+  const timezone = resolveTimeZone(profile?.timezone);
+  const isStudent = profile?.role === "student";
+  let attendance: Awaited<ReturnType<typeof getOwnAttendanceHistory>> | null = null;
+  if (isStudent) {
+    const supabase = await createClient();
+    attendance = await getOwnAttendanceHistory(supabase);
+  }
 
   // Resolve display values: profile row → auth user_metadata → empty string.
   // This ensures the page always shows something even when the RLS query fails.
@@ -32,10 +46,7 @@ export default async function AccountPage() {
 
   const roleLabel = profile?.role === "teacher" ? "Teacher" : "Student";
   const memberSince = profile
-    ? new Date(profile.created_at).toLocaleDateString("en-US", {
-        month: "long",
-        year: "numeric",
-      })
+    ? formatInTimeZone(new Date(profile.created_at), timezone, "MMMM yyyy")
     : null;
 
   return (
@@ -67,6 +78,7 @@ export default async function AccountPage() {
                 }
               />
               {memberSince && <Row label="Member Since" value={memberSince} />}
+              <Row label="Timezone" value={timezone} />
             </dl>
           </div>
         </section>
@@ -86,6 +98,60 @@ export default async function AccountPage() {
             />
           </div>
         </section>
+
+        {/* Change timezone */}
+        <section aria-labelledby="timezone-heading">
+          <h2
+            id="timezone-heading"
+            className="text-sm font-semibold text-muted-text uppercase tracking-wide mb-3"
+          >
+            Timezone
+          </h2>
+          <div className="bg-card-bg border border-soft-border rounded-2xl shadow-card p-6">
+            <TimezoneForm currentTimezone={timezone} />
+          </div>
+        </section>
+
+        {/* Attendance history — students only, read-only */}
+        {isStudent && attendance && (
+          <section aria-labelledby="attendance-heading">
+            <h2
+              id="attendance-heading"
+              className="text-sm font-semibold text-muted-text uppercase tracking-wide mb-3"
+            >
+              Attendance History
+            </h2>
+            <div className="bg-card-bg border border-soft-border rounded-2xl shadow-card p-6 flex flex-col gap-4">
+              {attendance.tally.total === 0 ? (
+                <p className="text-sm text-muted-text text-center py-2">
+                  No concluded meetings yet.
+                </p>
+              ) : (
+                <>
+                  <div className="grid grid-cols-4 gap-3 text-center">
+                    <div>
+                      <p className="text-lg font-bold text-green-600">{attendance.tally.present}</p>
+                      <p className="text-xs text-muted-text">Present</p>
+                    </div>
+                    <div>
+                      <p className="text-lg font-bold text-orange-500">{attendance.tally.late}</p>
+                      <p className="text-xs text-muted-text">Late</p>
+                    </div>
+                    <div>
+                      <p className="text-lg font-bold text-red-500">{attendance.tally.absent}</p>
+                      <p className="text-xs text-muted-text">Absent</p>
+                    </div>
+                    <div>
+                      <p className="text-lg font-bold text-dark-text">{attendance.tally.rate}%</p>
+                      <p className="text-xs text-muted-text">Rate</p>
+                    </div>
+                  </div>
+                  <AttendanceHistoryList entries={attendance.history} isTeacher={false} showClassName />
+                </>
+              )}
+            </div>
+          </section>
+        )}
       </div>
     </div>
   );

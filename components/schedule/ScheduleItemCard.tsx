@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { MapPin, Link as LinkIcon } from "lucide-react";
-import { formatTime, isSafeUrl } from "@/lib/utils";
+import { isSafeUrl } from "@/lib/utils";
+import { getMeetingStartInstant, formatZonedTime } from "@/lib/timezone";
+import { useViewerTimezone } from "@/components/timezone/TimezoneProvider";
 import StatusBadge from "@/components/ui/StatusBadge";
 import JoinMeetingLink from "./JoinMeetingLink";
 import { clickableCardProps, stopCardClick, CLICKABLE_CARD_CLASSES } from "@/lib/clickableCard";
@@ -28,6 +30,19 @@ export default function ScheduleItemCard({
   const safeLink = isSafeUrl(item.meetingLink) ? item.meetingLink! : null;
   const classHref = isTeacher ? `/teacher/classes/${item.classId}` : `/classes/${item.classId}`;
   const canOpenMeeting = Boolean(onOpenMeeting) && item.source === "meeting";
+
+  // Viewer-local start time — computed from the absolute instant, not
+  // the raw stored wall-clock string, so a viewer in a different
+  // timezone than the item's own sees their own local clock time.
+  const viewerTimezone = useViewerTimezone();
+  const startTimeLabel = formatZonedTime(
+    getMeetingStartInstant({
+      meeting_date: item.date,
+      start_time: item.startTime,
+      timezone: item.timezone,
+    }).toISOString(),
+    viewerTimezone
+  );
 
   // Only a real class_meetings row has a genuine meeting id to attribute
   // a join to — a schedule-template projection's `id` is a synthetic
@@ -97,7 +112,7 @@ export default function ScheduleItemCard({
                 isCancelled ? "text-muted-text" : "text-primary"
               }`}
             >
-              {formatTime(item.startTime)}
+              {startTimeLabel}
             </span>
             <span
               className={`text-sm font-semibold ${
@@ -144,7 +159,7 @@ export default function ScheduleItemCard({
               isCancelled ? "text-muted-text" : "text-primary"
             }`}
           >
-            {formatTime(item.startTime)}
+            {startTimeLabel}
           </span>
           <Link
             href={classHref}

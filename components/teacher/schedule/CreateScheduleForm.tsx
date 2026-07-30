@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarDays } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { TIMEZONE_OPTIONS } from "@/lib/timezone";
+import { useViewerTimezone } from "@/components/timezone/TimezoneProvider";
 
 const DAY_OPTIONS = [
   { value: 0, label: "Sunday" },
@@ -23,29 +25,20 @@ const PROVIDER_OPTIONS = [
   { value: "In person", label: "In person" },
 ];
 
-const TIMEZONE_OPTIONS = [
-  { value: "America/Panama", label: "America/Panama (UTC-5)" },
-  { value: "America/New_York", label: "America/New_York" },
-  { value: "America/Chicago", label: "America/Chicago" },
-  { value: "America/Denver", label: "America/Denver" },
-  { value: "America/Los_Angeles", label: "America/Los_Angeles" },
-  { value: "America/Bogota", label: "America/Bogota" },
-  { value: "America/Lima", label: "America/Lima" },
-  { value: "Europe/London", label: "Europe/London" },
-  { value: "Europe/Madrid", label: "Europe/Madrid" },
-  { value: "UTC", label: "UTC" },
-];
-
 const inputCls =
   "w-full px-3.5 py-2.5 text-sm bg-page-bg border border-soft-border rounded-xl text-dark-text placeholder:text-muted-text focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition";
 
 export default function CreateScheduleForm({ classId }: { classId: string }) {
   const router = useRouter();
+  // Defaults to the creating teacher's own saved timezone (see
+  // CreateMeetingForm's identical reasoning) — a recurring schedule's
+  // wall-clock time belongs to whatever zone is selected here.
+  const viewerTimezone = useViewerTimezone();
   const [open, setOpen] = useState(false);
   const [dayOfWeek, setDayOfWeek] = useState("1");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
-  const [timezone, setTimezone] = useState("America/Panama");
+  const [timezone, setTimezone] = useState(viewerTimezone);
   const [provider, setProvider] = useState("");
   const [meetingLink, setMeetingLink] = useState("");
   const [meetingId, setMeetingId] = useState("");
@@ -58,7 +51,7 @@ export default function CreateScheduleForm({ classId }: { classId: string }) {
     setDayOfWeek("1");
     setStartTime("");
     setEndTime("");
-    setTimezone("America/Panama");
+    setTimezone(viewerTimezone);
     setProvider("");
     setMeetingLink("");
     setMeetingId("");

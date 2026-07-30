@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { formatInTimeZone } from "date-fns-tz";
 import { GraduationCap } from "lucide-react";
 import { getCurrentProfile } from "@/lib/supabase/helpers";
 import { getInitials } from "@/lib/utils";
+import { resolveTimeZone } from "@/lib/timezone";
 import { createClient } from "@/lib/supabase/server";
 import TopBar from "@/components/nav/TopBar";
 import CreateClassForm from "@/components/classes/CreateClassForm";
@@ -68,8 +70,8 @@ export default async function ClassesPage() {
     }
   }
 
-  const formatDate = (iso: string) =>
-    new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  const timezone = resolveTimeZone(profile?.timezone);
+  const formatDate = (iso: string) => formatInTimeZone(new Date(iso), timezone, "MMM d, yyyy");
 
   return (
     <div>

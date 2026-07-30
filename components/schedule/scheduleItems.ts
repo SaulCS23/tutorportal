@@ -1,4 +1,5 @@
 import { toLocalISODate } from "@/lib/utils";
+import { getMeetingStartInstant, nextScheduleOccurrenceDate, weekdayOfDateString } from "@/lib/timezone";
 
 export type RawClassSchedule = {
   id: string;
@@ -155,4 +156,138 @@ export function getUpcomingMeetings(
     })
     .slice(0, limit)
     .map(meetingToItem);
+}
+
+type NextMeetingCandidate = {
+  id: string;
+  class_id: string;
+  meeting_date: string;
+  start_time: string;
+  end_time: string;
+  timezone: string;
+  status: "scheduled" | "completed" | "cancelled" | "group_pending_reschedule";
+  meeting_provider: string | null;
+  meeting_link: string | null;
+  location: string | null;
+  classes: { name: string; subject: string | null } | null;
+};
+
+type NextScheduleCandidate = {
+  class_id: string;
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+  timezone: string;
+  meeting_provider: string | null;
+  meeting_link: string | null;
+  location: string | null;
+  classes: { name: string; subject: string | null } | null;
+};
+
+export type NextMeetingInfo = {
+  /** "meeting" when a concrete class_meetings row won; "schedule" when no
+   *  concrete meeting exists yet and the recurring template's own next
+   *  occurrence won instead. */
+  source: "meeting" | "schedule";
+  classId: string;
+  className: string;
+  subject: string | null;
+  /** The concrete calendar date this occurs on, in `timezone` — always
+   *  present regardless of source, so a caller never has to re-derive it
+   *  from day_of_week (which would be wrong for a concrete meeting dated
+   *  more than a week out). */
+  date: string;
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+  timezone: string;
+  meetingProvider: string | null;
+  meetingLink: string | null;
+  location: string | null;
+  /** The concrete class_meetings row id when source is "meeting", else
+   *  null — lets a Join button record real attendance. */
+  meetingId: string | null;
+};
+
+/**
+ * The single definition of "next meeting" shared by the Dashboard's Next
+ * Meeting card and the Schedule page's calendar/upcoming-meetings view —
+ * same merge rule as getItemsForDate: a concrete, non-cancelled
+ * class_meetings row on a given calendar date always supersedes that
+ * class's recurring class_schedules projection for that same date (a
+ * reschedule/makeup is authoritative over the template it replaces), so a
+ * superseded template occurrence is never offered as a candidate. Ordering
+ * is by each candidate's real absolute start instant (via
+ * getMeetingStartInstant), never by comparing date/time strings across
+ * possibly-different timezones.
+ */
+export function getNextMeeting(
+  schedules: NextScheduleCandidate[],
+  meetings: NextMeetingCandidate[],
+  now: Date = new Date()
+): NextMeetingInfo | null {
+  let best: NextMeetingInfo | null = null;
+  let bestInstant: Date | null = null;
+
+  for (const m of meetings) {
+    if (m.status === "cancelled") continue;
+    const instant = getMeetingStartInstant({
+      meeting_date: m.meeting_date,
+      start_time: m.start_time,
+      timezone: m.timezone,
+    });
+    if (instant < now) continue;
+    if (!bestInstant || instant < bestInstant) {
+      bestInstant = instant;
+      best = {
+        source: "meeting",
+        classId: m.class_id,
+        className: m.classes?.name ?? "Unknown Class",
+        subject: m.classes?.subject ?? null,
+        date: m.meeting_date,
+        dayOfWeek: weekdayOfDateString(m.meeting_date),
+        startTime: m.start_time,
+        endTime: m.end_time,
+        timezone: m.timezone,
+        meetingProvider: m.meeting_provider,
+        meetingLink: m.meeting_link,
+        location: m.location,
+        meetingId: m.id,
+      };
+    }
+  }
+
+  for (const s of schedules) {
+    const dateISO = nextScheduleOccurrenceDate(s.day_of_week, s.start_time, s.timezone, now);
+    const supersededByMeeting = meetings.some(
+      (m) => m.class_id === s.class_id && m.meeting_date === dateISO && m.status !== "cancelled"
+    );
+    if (supersededByMeeting) continue;
+
+    const instant = getMeetingStartInstant({
+      meeting_date: dateISO,
+      start_time: s.start_time,
+      timezone: s.timezone,
+    });
+    if (!bestInstant || instant < bestInstant) {
+      bestInstant = instant;
+      best = {
+        source: "schedule",
+        classId: s.class_id,
+        className: s.classes?.name ?? "Unknown Class",
+        subject: s.classes?.subject ?? null,
+        date: dateISO,
+        dayOfWeek: s.day_of_week,
+        startTime: s.start_time,
+        endTime: s.end_time,
+        timezone: s.timezone,
+        meetingProvider: s.meeting_provider,
+        meetingLink: s.meeting_link,
+        location: s.location,
+        meetingId: null,
+      };
+    }
+  }
+
+  return best;
 }

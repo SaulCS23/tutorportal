@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { formatInTimeZone } from "date-fns-tz";
 import { BookOpen, Megaphone, ChevronRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentProfile } from "@/lib/supabase/helpers";
 import { formatDueDate } from "@/lib/utils";
+import { resolveTimeZone } from "@/lib/timezone";
 
 export const metadata: Metadata = { title: "Class Overview" };
 
@@ -10,7 +13,8 @@ type Props = { params: Promise<{ classId: string }> };
 
 export default async function TeacherClassOverviewPage({ params }: Props) {
   const { classId } = await params;
-  const supabase = await createClient();
+  const [supabase, profile] = await Promise.all([createClient(), getCurrentProfile()]);
+  const timezone = resolveTimeZone(profile?.timezone);
 
   const [{ data: announcements }, { data: assignments }] = await Promise.all([
     supabase
@@ -27,12 +31,7 @@ export default async function TeacherClassOverviewPage({ params }: Props) {
       .limit(3),
   ]);
 
-  const formatDate = (iso: string) =>
-    new Date(iso).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
+  const formatDate = (iso: string) => formatInTimeZone(new Date(iso), timezone, "MMM d, yyyy");
 
   return (
     <div className="flex flex-col gap-8">
@@ -69,7 +68,7 @@ export default async function TeacherClassOverviewPage({ params }: Props) {
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium text-dark-text truncate">{a.title}</p>
                   <p className="text-xs text-muted-text">
-                    {a.due_at ? `Due ${formatDueDate(a.due_at)}` : "No due date"} · {a.points} pts
+                    {a.due_at ? `Due ${formatDueDate(a.due_at, timezone)}` : "No due date"} · {a.points} pts
                   </p>
                 </div>
                 <span

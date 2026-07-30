@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { formatTime, splitDateAndTime } from "@/lib/utils";
+import { useViewerTimezone } from "@/components/timezone/TimezoneProvider";
 import DatePicker from "@/components/ui/DatePicker";
 import { rejectGroupReschedule, resolveGroupReschedule } from "@/components/schedule/meetingCancellation";
 
@@ -96,6 +97,12 @@ export default function GroupRescheduleRequestCard({
   request: GroupRescheduleForReview;
 }) {
   const router = useRouter();
+  // Purely informational displays (what/when a student proposed) always
+  // show in the reviewing teacher's own timezone — separate from the
+  // `timezone` form field below, which is part of the actual reschedule
+  // write path and stays anchored to the original meeting's timezone by
+  // design (untouched here).
+  const viewerTimezone = useViewerTimezone();
   const [showChoices, setShowChoices] = useState(false);
   const [choice, setChoice] = useState<Choice | null>(null);
   const [meetingDate, setMeetingDate] = useState("");
@@ -255,13 +262,13 @@ export default function GroupRescheduleRequestCard({
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <p className="text-sm font-medium text-dark-text">{p.studentName}</p>
                 <p className="text-xs text-muted-text">
-                  Requested {formatRequestedAt(p.createdAt, request.meetingTimezone)}
+                  Requested {formatRequestedAt(p.createdAt, viewerTimezone)}
                 </p>
               </div>
               <div className="flex flex-col gap-1">
                 {p.options.map((opt, i) => (
                   <p key={opt.id} className="text-xs text-muted-text">
-                    Option {i + 1}: {formatProposalOption(opt, request.meetingTimezone)}
+                    Option {i + 1}: {formatProposalOption(opt, viewerTimezone)}
                   </p>
                 ))}
               </div>
@@ -304,7 +311,7 @@ export default function GroupRescheduleRequestCard({
               <p className="text-xs font-medium text-dark-text">
                 {p.studentName}{" "}
                 <span className="font-normal text-muted-text">
-                  — requested {formatRequestedAt(p.createdAt, request.meetingTimezone)}
+                  — requested {formatRequestedAt(p.createdAt, viewerTimezone)}
                 </span>
               </p>
               <div className="flex flex-col gap-1.5">
@@ -320,7 +327,7 @@ export default function GroupRescheduleRequestCard({
                       className="accent-primary"
                     />
                     <span>
-                      Option {i + 1}: {formatProposalOption(opt, request.meetingTimezone)}
+                      Option {i + 1}: {formatProposalOption(opt, viewerTimezone)}
                     </span>
                   </label>
                 ))}

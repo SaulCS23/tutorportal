@@ -2,10 +2,13 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { formatInTimeZone } from "date-fns-tz";
 import { X, Clock, MapPin, Link as LinkIcon, AlertCircle } from "lucide-react";
 import type { Matcher } from "react-day-picker";
 import { createClient } from "@/lib/supabase/client";
-import { formatTime, isSafeUrl, parseLocalISODate } from "@/lib/utils";
+import { isSafeUrl, parseLocalISODate } from "@/lib/utils";
+import { getMeetingStartInstant, getMeetingEndInstant, formatZonedTime } from "@/lib/timezone";
+import { useViewerTimezone } from "@/components/timezone/TimezoneProvider";
 import DatePicker from "@/components/ui/DatePicker";
 import StatusBadge from "@/components/ui/StatusBadge";
 import JoinMeetingLink from "./JoinMeetingLink";
@@ -31,24 +34,13 @@ const emptyOptions = (): OptionDraft[] => [
 const inputCls =
   "w-full px-3.5 py-2.5 text-sm bg-page-bg border border-soft-border rounded-xl text-dark-text placeholder:text-muted-text focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition";
 
-function formatDateLabel(dateStr: string) {
-  return new Date(`${dateStr}T00:00:00`).toLocaleDateString("en-US", {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-
+/** Every date/time shown in this modal is derived from an absolute
+ *  instant and formatted in the *viewer's* timezone (formatInstant's
+ *  `timezone` param), never the meeting's own stored timezone — a
+ *  Denver teacher and a Panama student opening the same meeting see
+ *  their own local clock time for the exact same moment. */
 function formatInstant(iso: string, timezone: string) {
-  return new Date(iso).toLocaleString("en-US", {
-    timeZone: timezone,
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
+  return formatInTimeZone(new Date(iso), timezone, "EEE, MMM d, h:mm a");
 }
 
 const REQUEST_STATUS_LABEL: Record<MakeupRequest["status"], string> = {
@@ -75,6 +67,7 @@ export default function MeetingDetailModal({
   isTeacher?: boolean;
   onClose: () => void;
 }) {
+  const viewerTimezone = useViewerTimezone();
   const [loading, setLoading] = useState(!isTeacher);
   const [eligibility, setEligibility] = useState<MeetingCancellationEligibility | null>(null);
   const [existingRequest, setExistingRequest] = useState<MakeupRequest | null>(null);
@@ -166,6 +159,21 @@ export default function MeetingDetailModal({
   const safeLink = isSafeUrl(item.meetingLink) ? item.meetingLink! : null;
   const heading = item.title ?? item.className;
 
+  // The meeting's absolute start/end instants — computed once from the
+  // meeting's own stored date/time/timezone, then every display below
+  // converts these into the current viewer's timezone. Never display
+  // item.date/item.startTime/item.endTime/item.timezone directly.
+  const startInstant = getMeetingStartInstant({
+    meeting_date: item.date,
+    start_time: item.startTime,
+    timezone: item.timezone,
+  });
+  const endInstant = getMeetingEndInstant({
+    meeting_date: item.date,
+    end_time: item.endTime,
+    timezone: item.timezone,
+  });
+
   // A proposed makeup date can never fall before the original meeting (an
   // option must start after it ends) or more than 7 days after it (the
   // same window request_individual_makeup enforces server-side) — greying
@@ -229,8 +237,10 @@ export default function MeetingDetailModal({
             </div>
             <p className="flex items-center gap-2 text-dark-text">
               <Clock size={14} className="text-muted-text shrink-0" aria-hidden="true" />
-              {formatDateLabel(item.date)} · {formatTime(item.startTime)} – {formatTime(item.endTime)}{" "}
-              <span className="text-xs text-slate-400">({item.timezone})</span>
+              {formatInTimeZone(startInstant, viewerTimezone, "EEEE, MMMM d, yyyy")} ·{" "}
+              {formatZonedTime(startInstant.toISOString(), viewerTimezone)} –{" "}
+              {formatZonedTime(endInstant.toISOString(), viewerTimezone)}{" "}
+              <span className="text-xs text-slate-400">({viewerTimezone})</span>
             </p>
             {teacherName && <p className="text-muted-text">with {teacherName}</p>}
             {item.location && (
@@ -256,7 +266,6 @@ export default function MeetingDetailModal({
             <AttendanceSection
               meetingId={item.id}
               classId={item.classId}
-              timezone={item.timezone}
               isTeacher={isTeacher}
               refreshKey={attendanceRefreshKey}
             />
@@ -318,8 +327,8 @@ export default function MeetingDetailModal({
                           key={opt.id}
                           className="text-xs rounded-lg px-3 py-2 border bg-slate-50 border-soft-border text-muted-text"
                         >
-                          Option {i + 1}: {formatInstant(opt.proposed_start_at, item.timezone)} –{" "}
-                          {formatInstant(opt.proposed_end_at, item.timezone)}
+                          Option {i + 1}: {formatInstant(opt.proposed_start_at, viewerTimezone)} –{" "}
+                          {formatInstant(opt.proposed_end_at, viewerTimezone)}
                         </div>
                       ))}
                     </div>
@@ -351,8 +360,8 @@ export default function MeetingDetailModal({
                           : "bg-slate-50 border-soft-border text-muted-text"
                       }`}
                     >
-                      Option {i + 1}: {formatInstant(opt.proposed_start_at, item.timezone)} –{" "}
-                      {formatInstant(opt.proposed_end_at, item.timezone)}
+                      Option {i + 1}: {formatInstant(opt.proposed_start_at, viewerTimezone)} –{" "}
+                      {formatInstant(opt.proposed_end_at, viewerTimezone)}
                       {existingRequest.selected_option_id === opt.id && " (approved)"}
                     </div>
                   ))}
@@ -439,7 +448,7 @@ export default function MeetingDetailModal({
                   <p className="text-sm text-dark-text">
                     Cancellation cutoff:{" "}
                     <span className="font-semibold">
-                      {eligibility ? formatInstant(eligibility.cutoff_at, item.timezone) : "—"}
+                      {eligibility ? formatInstant(eligibility.cutoff_at, viewerTimezone) : "—"}
                     </span>
                   </p>
                   <button
@@ -461,7 +470,7 @@ export default function MeetingDetailModal({
                 </div>
                 {eligibility && (
                   <p className="text-xs text-muted-text">
-                    Cutoff was {formatInstant(eligibility.cutoff_at, item.timezone)}.
+                    Cutoff was {formatInstant(eligibility.cutoff_at, viewerTimezone)}.
                   </p>
                 )}
               </div>
