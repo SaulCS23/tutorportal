@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-## Project
+# Project
 
 TutorPortal is a tutoring management platform built with:
 
@@ -10,7 +10,11 @@ TutorPortal is a tutoring management platform built with:
 - Supabase
 - Vercel
 
-The goal is to build a production-quality tutoring platform that is clean, maintainable, and scalable.
+The primary goal is to build a production-quality tutoring platform that is simple, maintainable, scalable, and reliable.
+
+Long-term, TutorPortal's competitive advantage is AI, not feature bloat.
+
+Whenever making implementation decisions, prefer simple solutions that create high-quality data for future AI features.
 
 ---
 
@@ -20,12 +24,17 @@ Always:
 
 - understand the existing implementation before changing it;
 - find the root cause instead of patching symptoms;
-- reuse existing components, utilities, hooks and RPCs;
+- reuse existing components, utilities, hooks, helpers, RPCs, and database logic;
 - keep the codebase consistent;
 - avoid duplicate logic;
-- preserve existing behavior unless explicitly requested otherwise.
+- preserve existing behavior unless explicitly requested otherwise;
+- prefer small, incremental improvements over large rewrites.
 
 Never redesign unrelated parts of the project.
+
+Never over-engineer.
+
+If two solutions are equally good, choose the simpler one.
 
 ---
 
@@ -33,15 +42,42 @@ Never redesign unrelated parts of the project.
 
 Supabase is the source of truth.
 
-Never edit an already-applied migration.
+Database migrations are immutable.
+
+Never modify an already-applied migration.
 
 Always create a new migration.
 
-Prefer extending existing RPCs instead of creating duplicate logic.
+Never silently change existing schemas.
+
+Prefer extending existing tables, RPCs, triggers, and policies instead of duplicating functionality.
 
 Respect Row Level Security.
 
-Never use frontend-only writes for important workflows.
+Important workflows must happen in the database whenever possible.
+
+Examples:
+
+- notifications
+- attendance
+- audit history
+- status transitions
+
+Avoid frontend-only writes for critical business logic.
+
+When adding data, prefer storing raw information instead of only derived values.
+
+Example:
+
+Store:
+
+- joined_at
+
+instead of only:
+
+- attendance = present
+
+This allows future AI features to analyze behavior.
 
 ---
 
@@ -53,11 +89,17 @@ Reuse existing:
 - cards
 - modals
 - StatusBadge
-- spacing
 - typography
+- spacing
 - loading states
+- empty states
+- toast notifications
 
-Keep the application visually consistent.
+Keep the UI visually consistent.
+
+Avoid introducing new visual styles unless necessary.
+
+If an item represents a meeting or homework assignment, it should generally be clickable using the project's reusable clickable-card pattern.
 
 ---
 
@@ -79,7 +121,39 @@ When improving this workflow:
 
 - preserve history;
 - preserve submitted proposals;
-- never lose audit information.
+- preserve audit information;
+- never lose previous meeting relationships.
+
+---
+
+# Homework
+
+Homework should remain simple.
+
+Avoid unnecessary grading complexity.
+
+Reuse existing assignment flows.
+
+Any notifications related to homework should originate from the database.
+
+---
+
+# Attendance
+
+Attendance should be automatic whenever possible.
+
+Teacher intervention should be the exception.
+
+Automatic attendance is based only on actions TutorPortal can observe.
+
+Teachers must always be able to override automatic attendance.
+
+Store both:
+
+- raw attendance data
+- calculated attendance status
+
+Future AI features will rely on attendance history.
 
 ---
 
@@ -90,25 +164,29 @@ Notifications are in-site notifications.
 Current supported events include:
 
 Teacher:
+
 - makeup requested
 - group reschedule required
 - homework submitted
 
 Student:
+
 - homework assigned
 - homework graded
 - makeup approved
 - makeup rejected
 - meeting rescheduled
 
-Notifications must be created from the server/database, not only in frontend state.
+Notifications must always originate from the backend/database.
 
 Always verify:
 
-- recipient
+- correct recipient
 - unread badge
 - mark as read
 - persistence after refresh
+
+Never implement notification logic only in frontend state.
 
 ---
 
@@ -120,21 +198,63 @@ America/Panama
 
 Reuse existing helpers.
 
-Never introduce new date formatting unless necessary.
+Never introduce duplicate date formatting utilities.
 
-Do not break month navigation in DatePicker.
+Do not break DatePicker navigation.
+
+Keep all displayed dates and stored timestamps consistent.
 
 ---
 
 # TypeScript
 
-Avoid `any`.
+Avoid any.
 
 Prefer existing shared types.
 
-Keep components small.
+Keep components focused.
 
-Move repeated logic into helpers.
+Extract repeated logic into shared helpers.
+
+Favor composition over duplication.
+
+---
+
+# Routing
+
+Never duplicate pages that already exist.
+
+Reuse existing:
+
+- meeting detail views
+- homework pages
+- dashboards
+- modals
+
+If multiple cards represent the same resource, they should navigate consistently.
+
+---
+
+# AI Philosophy
+
+TutorPortal's uniqueness comes from AI.
+
+Current features should collect clean, reliable data instead of implementing complex business logic.
+
+Whenever possible, preserve information that could later improve AI analysis.
+
+Examples:
+
+- join timestamps
+- attendance history
+- homework completion
+- grades
+- meeting history
+- notification history
+
+Do not build speculative AI features.
+
+Instead, build clean infrastructure that future AI systems can leverage.
 
 ---
 
@@ -150,6 +270,8 @@ unless explicitly requested.
 
 Do not commit unless asked.
 
+Do not delete files unless requested.
+
 ---
 
 # Verification
@@ -162,18 +284,42 @@ npm run lint
 
 npm run build
 
-If user interaction changed, provide manual testing steps.
+If user interaction changed:
 
-Do not claim something is fixed without explaining how it was verified.
+Provide manual testing steps.
+
+Do not claim something is fixed without explaining:
+
+- how it was implemented;
+- how it was verified;
+- any remaining limitations.
 
 ---
 
 # Response Format
 
-At the end of every task report:
+At the end of every implementation include:
 
-- Root cause
-- Files changed
-- Database migrations
-- Manual testing
-- Remaining limitations
+## Root Cause
+
+Explain why the issue existed.
+
+## Solution
+
+Explain the implementation.
+
+## Files Changed
+
+List modified files.
+
+## Database Migrations
+
+Explain schema changes.
+
+## Manual Testing
+
+Explain exactly what should be tested.
+
+## Remaining Limitations
+
+Be honest about anything intentionally left for future work.

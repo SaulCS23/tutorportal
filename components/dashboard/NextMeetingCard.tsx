@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { CalendarDays, Clock, Link as LinkIcon } from "lucide-react";
 import { DAY_NAMES, formatTime, isSafeUrl } from "@/lib/utils";
 import SectionHeading from "@/components/ui/SectionHeading";
+import JoinMeetingLink from "@/components/schedule/JoinMeetingLink";
 import { clickableCardProps, stopCardClick } from "@/lib/clickableCard";
 
 export type NextMeeting = {
@@ -14,15 +15,23 @@ export type NextMeeting = {
   meeting_link: string | null;
   location: string | null;
   classes: { name: string; subject: string | null } | null;
+  /** The concrete class_meetings row for this occurrence, if one has
+   *  been created yet — lets the Join button record attendance the same
+   *  way every other real-meeting Join link does. Null/undefined for a
+   *  pure recurring-template occurrence with no dated meeting yet. */
+  meetingId?: string | null;
 };
 
 /**
  * Derived from the recurring class_schedules template (see
- * lib/utils#findNextSchedule), not a concrete class_meetings row — there
- * is no single real meeting id to open a MeetingDetailModal for, so the
- * whole card instead routes to the Schedule page, which resolves the
- * actual next concrete meeting (or the same recurring slot) and can open
- * its real detail view there.
+ * lib/utils#findNextSchedule) by default — the card itself always routes
+ * to the Schedule page on click, which resolves the actual next concrete
+ * meeting (or the same recurring slot) and can open its real detail view
+ * there. The "Join" button specifically uses `meetingId` (resolved
+ * server-side, see dashboard/page.tsx#resolveNextMeetingId) when a real
+ * class_meetings row exists for this occurrence, so attendance is
+ * recorded exactly like every other real-meeting Join link; it falls
+ * back to a plain, unrecorded link only when no dated meeting exists yet.
  */
 export default function NextMeetingCard({ meeting }: { meeting: NextMeeting | null }) {
   const router = useRouter();
@@ -84,7 +93,19 @@ export default function NextMeetingCard({ meeting }: { meeting: NextMeeting | nu
           )}
         </dl>
 
-        {safeLink ? (
+        {safeLink && meeting.meetingId ? (
+          <JoinMeetingLink
+            meetingId={meeting.meetingId}
+            href={safeLink}
+            onClick={stopCardClick}
+            className="w-full flex items-center justify-center gap-2 bg-white/20 border border-white/30 text-white text-sm font-medium rounded-xl py-2.5 hover:bg-white/30 transition-colors"
+          >
+            <LinkIcon size={14} aria-hidden="true" />
+            {meeting.meeting_provider === "Google Meet"
+              ? "Join Google Meet"
+              : "Join Meeting"}
+          </JoinMeetingLink>
+        ) : safeLink ? (
           <a
             href={safeLink}
             target="_blank"

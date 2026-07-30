@@ -2,6 +2,7 @@ import Link from "next/link";
 import { MapPin, Link as LinkIcon } from "lucide-react";
 import { formatTime, isSafeUrl } from "@/lib/utils";
 import StatusBadge from "@/components/ui/StatusBadge";
+import JoinMeetingLink from "./JoinMeetingLink";
 import { clickableCardProps, stopCardClick, CLICKABLE_CARD_CLASSES } from "@/lib/clickableCard";
 import type { ScheduleItem } from "./scheduleItems";
 
@@ -28,6 +29,18 @@ export default function ScheduleItemCard({
   const classHref = isTeacher ? `/teacher/classes/${item.classId}` : `/classes/${item.classId}`;
   const canOpenMeeting = Boolean(onOpenMeeting) && item.source === "meeting";
 
+  // Only a real class_meetings row has a genuine meeting id to attribute
+  // a join to — a schedule-template projection's `id` is a synthetic
+  // `schedule-...` string, so its Join link stays a plain anchor.
+  const joinAnchorClassName =
+    "inline-flex items-center gap-1 text-xs font-medium text-primary hover:text-primary-dark transition-colors";
+  const joinLabel = (
+    <>
+      <LinkIcon size={11} aria-hidden="true" />
+      {item.meetingProvider === "Google Meet" ? "Join Google Meet" : "Join Meeting"}
+    </>
+  );
+
   const joinRow = (item.location || safeLink) && (
     <div className="flex flex-wrap items-center gap-3 mt-2">
       {item.location && (
@@ -36,17 +49,27 @@ export default function ScheduleItemCard({
           {item.location}
         </span>
       )}
-      {safeLink && (
-        <a
+      {safeLink && item.source === "meeting" ? (
+        <JoinMeetingLink
+          meetingId={item.id}
           href={safeLink}
-          target="_blank"
-          rel="noopener noreferrer"
           onClick={stopCardClick}
-          className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:text-primary-dark transition-colors"
+          className={joinAnchorClassName}
         >
-          <LinkIcon size={11} aria-hidden="true" />
-          {item.meetingProvider === "Google Meet" ? "Join Google Meet" : "Join Meeting"}
-        </a>
+          {joinLabel}
+        </JoinMeetingLink>
+      ) : (
+        safeLink && (
+          <a
+            href={safeLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={stopCardClick}
+            className={joinAnchorClassName}
+          >
+            {joinLabel}
+          </a>
+        )
       )}
     </div>
   );

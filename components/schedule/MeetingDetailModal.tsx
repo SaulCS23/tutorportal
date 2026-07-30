@@ -8,6 +8,8 @@ import { createClient } from "@/lib/supabase/client";
 import { formatTime, isSafeUrl, parseLocalISODate } from "@/lib/utils";
 import DatePicker from "@/components/ui/DatePicker";
 import StatusBadge from "@/components/ui/StatusBadge";
+import JoinMeetingLink from "./JoinMeetingLink";
+import AttendanceSection from "./AttendanceSection";
 import type { ScheduleItem } from "./scheduleItems";
 import {
   getMeetingCancellationEligibility,
@@ -83,6 +85,10 @@ export default function MeetingDetailModal({
   const [options, setOptions] = useState<OptionDraft[]>(emptyOptions());
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  // Bumped after a successful Join so AttendanceSection (still mounted —
+  // the external link opens in a new tab) refetches instead of
+  // continuing to show whatever it loaded before the click.
+  const [attendanceRefreshKey, setAttendanceRefreshKey] = useState(0);
 
   useEffect(() => {
     if (isTeacher) {
@@ -234,17 +240,27 @@ export default function MeetingDetailModal({
               </p>
             )}
             {safeLink && (
-              <a
+              <JoinMeetingLink
+                meetingId={item.id}
                 href={safeLink}
-                target="_blank"
-                rel="noopener noreferrer"
+                onJoined={() => setAttendanceRefreshKey((k) => k + 1)}
                 className="inline-flex items-center gap-2 text-primary font-medium hover:underline w-fit"
               >
                 <LinkIcon size={14} aria-hidden="true" />
                 {item.meetingProvider === "Google Meet" ? "Join Google Meet" : "Join Meeting"}
-              </a>
+              </JoinMeetingLink>
             )}
           </div>
+
+          {item.status !== "cancelled" && (
+            <AttendanceSection
+              meetingId={item.id}
+              classId={item.classId}
+              timezone={item.timezone}
+              isTeacher={isTeacher}
+              refreshKey={attendanceRefreshKey}
+            />
+          )}
 
           <div className="border-t border-soft-border pt-4">
             {isTeacher ? (

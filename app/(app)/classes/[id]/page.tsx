@@ -13,6 +13,7 @@ import RemoveStudentButton from "@/components/classes/RemoveStudentButton";
 import DeleteClassButton from "@/components/classes/DeleteClassButton";
 import LeaveClassButton from "@/components/classes/LeaveClassButton";
 import StatusBadge from "@/components/ui/StatusBadge";
+import JoinMeetingLink from "@/components/schedule/JoinMeetingLink";
 
 export const metadata: Metadata = { title: "Class" };
 
@@ -333,17 +334,16 @@ export default async function ClassDetailPage({ params }: Props) {
                           </p>
                         )}
                         {safeLink && (
-                          <a
+                          <JoinMeetingLink
+                            meetingId={m.id}
                             href={safeLink}
-                            target="_blank"
-                            rel="noopener noreferrer"
                             className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:text-primary-dark transition-colors mt-1"
                           >
                             <LinkIcon size={14} aria-hidden="true" />
                             {m.meeting_provider === "Google Meet"
                               ? "Join Google Meet"
                               : "Join Meeting"}
-                          </a>
+                          </JoinMeetingLink>
                         )}
                       </div>
                     )}
