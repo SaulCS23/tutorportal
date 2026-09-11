@@ -7,6 +7,7 @@ import StatusBadge from "@/components/ui/StatusBadge";
 import JoinMeetingLink from "./JoinMeetingLink";
 import { clickableCardProps, stopCardClick, CLICKABLE_CARD_CLASSES } from "@/lib/clickableCard";
 import TakeClassButton from "./TakeClassButton";
+import ReleaseClassButton from "./ReleaseClassButton";
 import type { ScheduleItem } from "./scheduleItems";
 
 export default function ScheduleItemCard({
@@ -64,11 +65,14 @@ export default function ScheduleItemCard({
     </p>
   );
 
-  // Real meetings offer "Take Class" from inside the detail modal
-  // instead — putting it here too would be a redundant, easy-to-misclick
-  // duplicate action on the same card.
+  // Real meetings offer "Take Class"/"Release Class" from inside the
+  // detail modal instead — putting them here too would be a redundant,
+  // easy-to-misclick duplicate action on the same card.
   const takeClassRow = isTeacher && isUnassigned && !canOpenMeeting && (
     <TakeClassButton classId={item.classId} className="mt-1.5" />
+  );
+  const releaseClassRow = isTeacher && isOwnClass && !canOpenMeeting && (
+    <ReleaseClassButton classId={item.classId} className="mt-1.5" />
   );
 
   // Viewer-local start time — computed from the absolute instant, not
@@ -235,6 +239,7 @@ export default function ScheduleItemCard({
         {teacherLine}
         {studentsLine}
         {takeClassRow}
+        {releaseClassRow}
       </div>
       {joinRow}
     </li>

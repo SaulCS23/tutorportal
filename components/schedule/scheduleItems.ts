@@ -1,5 +1,10 @@
 import { toLocalISODate } from "@/lib/utils";
-import { getMeetingStartInstant, nextScheduleOccurrenceDate, weekdayOfDateString } from "@/lib/timezone";
+import {
+  getMeetingStartInstant,
+  hasMeetingConcluded,
+  currentOrNextScheduleOccurrenceDate,
+  weekdayOfDateString,
+} from "@/lib/timezone";
 
 export type RawClassSchedule = {
   id: string;
@@ -139,21 +144,28 @@ export function hasActivityOnDate(
 }
 
 /**
- * The next handful of concrete, non-cancelled class_meetings on or after
- * today, soonest first. Schedule-template projections are intentionally
- * excluded — "real, concrete dated meetings" only, per spec.
+ * The next handful of concrete, non-cancelled class_meetings that have
+ * not yet concluded, soonest-starting first. Schedule-template
+ * projections are intentionally excluded — "real, concrete dated
+ * meetings" only, per spec.
+ *
+ * Filters and sorts by each meeting's real absolute instant (via
+ * hasMeetingConcluded / getMeetingStartInstant), never a meeting_date-
+ * only cutoff — a meeting dated today that already ended must not
+ * appear here just because "today" hasn't rolled over yet, and two
+ * meetings in different stored timezones must still sort correctly
+ * relative to each other.
  */
 export function getUpcomingMeetings(
   meetings: RawClassMeeting[],
-  todayISO: string,
+  now: Date = new Date(),
   limit: number = 5
 ): ScheduleItem[] {
   return meetings
-    .filter((m) => m.status !== "cancelled" && m.meeting_date >= todayISO)
-    .sort((a, b) => {
-      if (a.meeting_date !== b.meeting_date) return a.meeting_date < b.meeting_date ? -1 : 1;
-      return a.start_time < b.start_time ? -1 : a.start_time > b.start_time ? 1 : 0;
-    })
+    .filter((m) => m.status !== "cancelled" && !hasMeetingConcluded(m, now))
+    .sort(
+      (a, b) => getMeetingStartInstant(a).getTime() - getMeetingStartInstant(b).getTime()
+    )
     .slice(0, limit)
     .map(meetingToItem);
 }
@@ -220,6 +232,15 @@ export type NextMeetingInfo = {
  * is by each candidate's real absolute start instant (via
  * getMeetingStartInstant), never by comparing date/time strings across
  * possibly-different timezones.
+ *
+ * A candidate is eligible as long as it has NOT CONCLUDED — its end
+ * instant is still in the future (hasMeetingConcluded) — not merely
+ * "hasn't started yet". A meeting currently in progress is therefore
+ * shown as the current/next meeting until it ends, rather than being
+ * skipped in favor of a future occurrence; this is the one place that
+ * choice is made, so the Dashboard and Schedule page can never disagree
+ * about it. "Past" is always decided from the real end timestamp, never
+ * from comparing meeting_date to today's date.
  */
 export function getNextMeeting(
   schedules: NextScheduleCandidate[],
@@ -231,12 +252,12 @@ export function getNextMeeting(
 
   for (const m of meetings) {
     if (m.status === "cancelled") continue;
+    if (hasMeetingConcluded(m, now)) continue;
     const instant = getMeetingStartInstant({
       meeting_date: m.meeting_date,
       start_time: m.start_time,
       timezone: m.timezone,
     });
-    if (instant < now) continue;
     if (!bestInstant || instant < bestInstant) {
       bestInstant = instant;
       best = {
@@ -258,7 +279,15 @@ export function getNextMeeting(
   }
 
   for (const s of schedules) {
-    const dateISO = nextScheduleOccurrenceDate(s.day_of_week, s.start_time, s.timezone, now);
+    // Today's own occurrence counts as current until it ends, not just
+    // until it starts — see currentOrNextScheduleOccurrenceDate.
+    const dateISO = currentOrNextScheduleOccurrenceDate(
+      s.day_of_week,
+      s.start_time,
+      s.end_time,
+      s.timezone,
+      now
+    );
     const supersededByMeeting = meetings.some(
       (m) => m.class_id === s.class_id && m.meeting_date === dateISO && m.status !== "cancelled"
     );

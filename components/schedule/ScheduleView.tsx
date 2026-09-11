@@ -36,6 +36,7 @@ export default function ScheduleView({
   isTeacher,
   viewerTeacherId = null,
   todayISO,
+  nowISO,
 }: {
   schedules: RawClassSchedule[];
   meetings: RawClassMeeting[];
@@ -48,11 +49,19 @@ export default function ScheduleView({
    *  master schedule. Always null for students. */
   viewerTeacherId?: string | null;
   todayISO: string;
+  /** The exact instant the page was rendered, server-computed and passed
+   *  down as a string for the same reason as todayISO — "Upcoming" must
+   *  filter out meetings that have already concluded by real absolute
+   *  instant (see getUpcomingMeetings), not by re-deriving "now" from the
+   *  client's own clock, which would disagree with the server render and
+   *  risk a hydration mismatch. */
+  nowISO: string;
 }) {
   // Computed server-side and passed down as a plain string so the very
   // first client render agrees with the server-rendered HTML — no
   // hydration mismatch from re-deriving "today" independently in the browser.
   const today = useMemo(() => parseLocalISODate(todayISO) ?? new Date(), [todayISO]);
+  const now = useMemo(() => new Date(nowISO), [nowISO]);
 
   const [selectedDate, setSelectedDate] = useState(today);
   const [displayedMonth, setDisplayedMonth] = useState(today);
@@ -71,8 +80,8 @@ export default function ScheduleView({
   );
 
   const upcoming = useMemo(
-    () => getUpcomingMeetings(meetings, todayISO, 5),
-    [meetings, todayISO]
+    () => getUpcomingMeetings(meetings, now, 5),
+    [meetings, now]
   );
 
   function goToday() {

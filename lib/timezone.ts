@@ -232,3 +232,36 @@ export function nextScheduleOccurrenceDate(
   }
   return candidateStr;
 }
+
+/**
+ * Like nextScheduleOccurrenceDate, but a slot that has already started
+ * today counts as the *current* occurrence — not superseded — until its
+ * END instant passes, rather than being skipped straight to next week
+ * the moment it starts. Used only by getNextMeeting's shared "what is
+ * the next/current meeting" definition (scheduleItems.ts, shared by the
+ * Dashboard's Next Meeting card and the Schedule page): a class in
+ * progress right now is the current meeting, not something to jump past
+ * in favor of an occurrence a week away. nextScheduleOccurrenceDate
+ * itself is unchanged and keeps its simpler "next start" meaning for its
+ * other (display-only) callers.
+ */
+export function currentOrNextScheduleOccurrenceDate(
+  dayOfWeek: number,
+  startTime: string,
+  endTime: string,
+  timeZone: string,
+  now: Date = new Date()
+): string {
+  const tz = resolveTimeZone(timeZone);
+  const todayStr = formatInTimeZone(now, tz, "yyyy-MM-dd");
+  const todayDow = weekdayOfDateString(todayStr);
+
+  if (dayOfWeek === todayDow) {
+    const endsAt = zonedDateTimeToUtc(todayStr, endTime.slice(0, 5), tz);
+    if (endsAt > now) {
+      return todayStr;
+    }
+  }
+
+  return nextScheduleOccurrenceDate(dayOfWeek, startTime, timeZone, now);
+}

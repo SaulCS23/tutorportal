@@ -40,6 +40,7 @@ export default async function SchedulePage() {
   let meetings: RawClassMeeting[] = [];
   let teacherMap: Record<string, string> = {};
   const studentsByClass: Record<string, string[]> = {};
+  let scheduleError: string | null = null;
 
   if (isTeacher) {
     // Every teacher shares one combined master schedule — see
@@ -48,10 +49,27 @@ export default async function SchedulePage() {
     // These bypass RLS internally (is_teacher()-gated), so this is the
     // only place that reads every class in the program regardless of
     // who owns it, rather than broadening table-level RLS everywhere.
-    const [{ data: masterSchedules }, { data: masterMeetings }] = await Promise.all([
+    const [
+      { data: masterSchedules, error: schedulesRpcError },
+      { data: masterMeetings, error: meetingsRpcError },
+    ] = await Promise.all([
       supabase.rpc("list_master_class_schedules"),
       supabase.rpc("list_master_class_meetings"),
     ]);
+
+    // Surfaced instead of silently falling back to an empty schedule — an
+    // RPC error here (e.g. the migration hasn't been applied yet, or a
+    // permissions problem) previously looked identical to "no classes",
+    // which made the real cause impossible to see from the UI.
+    if (schedulesRpcError || meetingsRpcError) {
+      console.error(
+        "[SchedulePage] master schedule RPC error:",
+        schedulesRpcError?.message,
+        meetingsRpcError?.message
+      );
+      scheduleError =
+        schedulesRpcError?.message || meetingsRpcError?.message || "Failed to load the schedule.";
+    }
 
     const rawSchedules = (masterSchedules as MasterScheduleRow[] | null) ?? [];
     const rawMeetings = (masterMeetings as MasterMeetingRow[] | null) ?? [];
@@ -126,6 +144,7 @@ export default async function SchedulePage() {
   }
 
   const todayISO = todayISODateInTimezone();
+  const nowISO = new Date().toISOString();
 
   return (
     <div>
@@ -133,6 +152,12 @@ export default async function SchedulePage() {
         title="Schedule"
         initials={getInitials(profile?.first_name, profile?.last_name)}
       />
+
+      {scheduleError && (
+        <p className="mb-6 text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-3.5 py-2.5">
+          Could not load the full schedule: {scheduleError}
+        </p>
+      )}
 
       <ScheduleView
         schedules={schedules}
@@ -142,6 +167,7 @@ export default async function SchedulePage() {
         isTeacher={isTeacher}
         viewerTeacherId={isTeacher ? profile?.id ?? null : null}
         todayISO={todayISO}
+        nowISO={nowISO}
       />
     </div>
   );

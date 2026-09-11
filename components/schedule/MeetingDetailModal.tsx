@@ -14,6 +14,7 @@ import StatusBadge from "@/components/ui/StatusBadge";
 import JoinMeetingLink from "./JoinMeetingLink";
 import AttendanceSection from "./AttendanceSection";
 import TakeClassButton from "./TakeClassButton";
+import ReleaseClassButton from "./ReleaseClassButton";
 import type { ScheduleItem } from "./scheduleItems";
 import {
   getMeetingCancellationEligibility,
@@ -330,6 +331,7 @@ export default function MeetingDetailModal({
                 >
                   Go to Meetings
                 </Link>
+                <ReleaseClassButton classId={item.classId} className="self-start" />
               </div>
             ) : loading ? (
               <p className="text-sm text-muted-text">Loading cancellation policy…</p>
