@@ -19,13 +19,16 @@ export default async function AppLayout({
     redirect("/login");
   }
 
-  const profile = await getCurrentProfile();
+  const [profile, { data: isAdmin }] = await Promise.all([
+    getCurrentProfile(),
+    supabase.rpc("is_admin"),
+  ]);
 
   return (
     <TimezoneProvider initialTimezone={profile?.timezone ?? null}>
       <div className="min-h-screen bg-page-bg">
         <div className="max-w-6xl mx-auto px-4 md:px-8 py-6 flex gap-10">
-          <AppNav />
+          <AppNav isAdmin={!!isAdmin} />
           <main className="flex-1 min-w-0 pb-24 md:pb-0">{children}</main>
         </div>
         <BottomNav />

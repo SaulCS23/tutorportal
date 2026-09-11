@@ -19,7 +19,7 @@ export default function LandingPage() {
               <li><a href="#features" className="hover:text-dark-text transition-colors">Features</a></li>
               <li><a href="#courses" className="hover:text-dark-text transition-colors">Courses</a></li>
               <li>
-                <Link href="/dashboard" className="hover:text-dark-text transition-colors">
+                <Link href="/login" className="hover:text-dark-text transition-colors">
                   Log In
                 </Link>
               </li>

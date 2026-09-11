@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, BookOpen, CalendarDays, GraduationCap, User, Award } from "lucide-react";
+import { LayoutDashboard, BookOpen, CalendarDays, GraduationCap, User, Award, ShieldCheck } from "lucide-react";
 import SignOutButton from "@/components/auth/SignOutButton";
 
 const links = [
@@ -14,8 +14,11 @@ const links = [
   { href: "/account", label: "Account", icon: User },
 ];
 
-export default function AppNav() {
+export default function AppNav({ isAdmin = false }: { isAdmin?: boolean }) {
   const pathname = usePathname();
+  const navLinks = isAdmin
+    ? [...links, { href: "/admin/teacher-requests", label: "Teacher Requests", icon: ShieldCheck }]
+    : links;
 
   return (
     <nav
@@ -28,7 +31,7 @@ export default function AppNav() {
         </span>
       </div>
 
-      {links.map(({ href, label, icon: Icon }) => {
+      {navLinks.map(({ href, label, icon: Icon }) => {
         const isActive = pathname === href;
         return (
           <Link

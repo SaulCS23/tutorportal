@@ -8,7 +8,10 @@ export type NotificationType =
   | "group_rescheduled"
   | "homework_assigned"
   | "homework_submitted"
-  | "homework_graded";
+  | "homework_graded"
+  | "teacher_access_requested"
+  | "teacher_access_approved"
+  | "teacher_access_rejected";
 
 export type Notification = {
   id: string;

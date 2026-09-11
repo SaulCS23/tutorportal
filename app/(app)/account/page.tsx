@@ -9,6 +9,7 @@ import { getOwnAttendanceHistory } from "@/lib/attendanceStats";
 import TopBar from "@/components/nav/TopBar";
 import AccountForm from "@/components/account/AccountForm";
 import TimezoneForm from "@/components/account/TimezoneForm";
+import TeacherAccessRequest from "@/components/account/TeacherAccessRequest";
 import AttendanceHistoryList from "@/components/schedule/AttendanceHistoryList";
 
 export const metadata: Metadata = { title: "Account" };
@@ -24,9 +25,23 @@ export default async function AccountPage() {
   const timezone = resolveTimeZone(profile?.timezone);
   const isStudent = profile?.role === "student";
   let attendance: Awaited<ReturnType<typeof getOwnAttendanceHistory>> | null = null;
+  let latestTeacherAccessRequest: {
+    status: "pending" | "approved" | "rejected";
+    created_at: string;
+    reviewer_note: string | null;
+  } | null = null;
   if (isStudent) {
     const supabase = await createClient();
     attendance = await getOwnAttendanceHistory(supabase);
+
+    const { data: requestRow } = await supabase
+      .from("teacher_access_requests")
+      .select("status, created_at, reviewer_note")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    latestTeacherAccessRequest = requestRow;
   }
 
   // Resolve display values: profile row → auth user_metadata → empty string.
@@ -111,6 +126,21 @@ export default async function AccountPage() {
             <TimezoneForm currentTimezone={timezone} />
           </div>
         </section>
+
+        {/* Teacher access request — students only */}
+        {isStudent && (
+          <section aria-labelledby="teacher-access-heading">
+            <h2
+              id="teacher-access-heading"
+              className="text-sm font-semibold text-muted-text uppercase tracking-wide mb-3"
+            >
+              Teacher Access
+            </h2>
+            <div className="bg-card-bg border border-soft-border rounded-2xl shadow-card p-6">
+              <TeacherAccessRequest latestRequest={latestTeacherAccessRequest} />
+            </div>
+          </section>
+        )}
 
         {/* Attendance history — students only, read-only */}
         {isStudent && attendance && (
