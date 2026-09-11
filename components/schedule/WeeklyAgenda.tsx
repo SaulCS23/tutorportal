@@ -24,6 +24,8 @@ export default function WeeklyAgenda({
   days,
   isTeacher,
   teacherMap,
+  studentsByClass = {},
+  viewerTeacherId = null,
   onPrevWeek,
   onNextWeek,
   onOpenMeeting,
@@ -33,6 +35,8 @@ export default function WeeklyAgenda({
   days: AgendaDay[];
   isTeacher: boolean;
   teacherMap: Record<string, string>;
+  studentsByClass?: Record<string, string[]>;
+  viewerTeacherId?: string | null;
   onPrevWeek: () => void;
   onNextWeek: () => void;
   onOpenMeeting?: (item: ScheduleItem) => void;
@@ -83,6 +87,8 @@ export default function WeeklyAgenda({
                       item={item}
                       isTeacher={isTeacher}
                       teacherName={item.teacherId ? teacherMap[item.teacherId] : null}
+                      studentNames={studentsByClass[item.classId] ?? []}
+                      viewerTeacherId={viewerTeacherId}
                       onOpenMeeting={onOpenMeeting}
                     />
                   ))}

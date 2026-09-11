@@ -10,11 +10,13 @@ export default function UpcomingMeetings({
   items,
   isTeacher,
   teacherMap,
+  viewerTeacherId = null,
   onOpenMeeting,
 }: {
   items: ScheduleItem[];
   isTeacher: boolean;
   teacherMap: Record<string, string>;
+  viewerTeacherId?: string | null;
   onOpenMeeting?: (item: ScheduleItem) => void;
 }) {
   const viewerTimezone = useViewerTimezone();
@@ -28,9 +30,16 @@ export default function UpcomingMeetings({
       ) : (
         <ul className="flex flex-col divide-y divide-soft-border" role="list">
           {items.map((item) => {
-            const classHref = isTeacher
-              ? `/teacher/classes/${item.classId}`
-              : `/classes/${item.classId}`;
+            // A teacher only gets a working class-management link for a
+            // class they actually own — another teacher's (or an
+            // unassigned) class on the shared master schedule has no
+            // page to land on here, so the row stays non-navigating.
+            const isOwnClass = !isTeacher || item.teacherId === viewerTeacherId;
+            const classHref = isOwnClass
+              ? isTeacher
+                ? `/teacher/classes/${item.classId}`
+                : `/classes/${item.classId}`
+              : null;
             const teacherName = item.teacherId ? teacherMap[item.teacherId] : null;
 
             // Absolute start instant, converted to the viewer's own
@@ -65,8 +74,16 @@ export default function UpcomingMeetings({
                       <StatusBadge status={item.status} />
                     )}
                   </div>
-                  {!isTeacher && teacherName && (
-                    <p className="text-xs text-muted-text truncate">with {teacherName}</p>
+                  {isTeacher ? (
+                    teacherName ? (
+                      <p className="text-xs text-muted-text truncate">Teacher: {teacherName}</p>
+                    ) : (
+                      <p className="text-xs text-amber-600 font-medium truncate">Unassigned</p>
+                    )
+                  ) : (
+                    teacherName && (
+                      <p className="text-xs text-muted-text truncate">with {teacherName}</p>
+                    )
                   )}
                 </div>
                 <ChevronRight
@@ -85,10 +102,12 @@ export default function UpcomingMeetings({
                   <button type="button" onClick={() => onOpenMeeting(item)} className={rowCls}>
                     {rowContent}
                   </button>
-                ) : (
+                ) : classHref ? (
                   <Link href={classHref} className={rowCls}>
                     {rowContent}
                   </Link>
+                ) : (
+                  <div className={rowCls}>{rowContent}</div>
                 )}
               </li>
             );

@@ -6,17 +6,26 @@ import { useViewerTimezone } from "@/components/timezone/TimezoneProvider";
 import StatusBadge from "@/components/ui/StatusBadge";
 import JoinMeetingLink from "./JoinMeetingLink";
 import { clickableCardProps, stopCardClick, CLICKABLE_CARD_CLASSES } from "@/lib/clickableCard";
+import TakeClassButton from "./TakeClassButton";
 import type { ScheduleItem } from "./scheduleItems";
 
 export default function ScheduleItemCard({
   item,
   isTeacher,
   teacherName,
+  studentNames = [],
+  viewerTeacherId = null,
   onOpenMeeting,
 }: {
   item: ScheduleItem;
   isTeacher: boolean;
   teacherName?: string | null;
+  /** Enrolled student names, teacher (master schedule) view only. */
+  studentNames?: string[];
+  /** The viewing teacher's own profile id, to tell their own class apart
+   *  from another teacher's (or an unassigned) class on the shared
+   *  master schedule. Always null for students. */
+  viewerTeacherId?: string | null;
   /** When provided (student view only), clicking a real meeting's card
    *  opens the meeting detail modal instead of navigating to the class
    *  page — schedule-template projections have no real meeting to
@@ -28,8 +37,39 @@ export default function ScheduleItemCard({
   const heading = item.title ?? item.className;
   const showClassName = item.title !== null && item.className !== heading;
   const safeLink = isSafeUrl(item.meetingLink) ? item.meetingLink! : null;
-  const classHref = isTeacher ? `/teacher/classes/${item.classId}` : `/classes/${item.classId}`;
+  // A teacher only has a working management page for a class they own —
+  // another teacher's (or an unassigned) class on the shared master
+  // schedule has nowhere to land, so the class name stays plain text.
+  const isOwnClass = !isTeacher || item.teacherId === viewerTeacherId;
+  const classHref = isOwnClass
+    ? isTeacher
+      ? `/teacher/classes/${item.classId}`
+      : `/classes/${item.classId}`
+    : null;
   const canOpenMeeting = Boolean(onOpenMeeting) && item.source === "meeting";
+  const isUnassigned = item.teacherId === null;
+
+  const teacherLine = isTeacher ? (
+    <p className="text-xs text-muted-text mt-0.5">
+      Teacher:{" "}
+      {teacherName ?? <span className="text-amber-600 font-medium">Unassigned</span>}
+    </p>
+  ) : (
+    teacherName && <p className="text-xs text-muted-text mt-0.5">with {teacherName}</p>
+  );
+
+  const studentsLine = isTeacher && studentNames.length > 0 && (
+    <p className="text-xs text-muted-text mt-0.5 truncate">
+      Students: {studentNames.join(", ")}
+    </p>
+  );
+
+  // Real meetings offer "Take Class" from inside the detail modal
+  // instead — putting it here too would be a redundant, easy-to-misclick
+  // duplicate action on the same card.
+  const takeClassRow = isTeacher && isUnassigned && !canOpenMeeting && (
+    <TakeClassButton classId={item.classId} className="mt-1.5" />
+  );
 
   // Viewer-local start time — computed from the absolute instant, not
   // the raw stored wall-clock string, so a viewer in a different
@@ -129,17 +169,20 @@ export default function ScheduleItemCard({
             {isPendingReschedule && <StatusBadge status={item.status!} />}
           </div>
           {showClassName && (
-            <Link
-              href={classHref}
-              onClick={stopCardClick}
-              className="text-xs text-primary hover:underline mt-0.5 inline-block"
-            >
-              {item.className}
-            </Link>
+            classHref ? (
+              <Link
+                href={classHref}
+                onClick={stopCardClick}
+                className="text-xs text-primary hover:underline mt-0.5 inline-block"
+              >
+                {item.className}
+              </Link>
+            ) : (
+              <p className="text-xs text-muted-text mt-0.5">{item.className}</p>
+            )
           )}
-          {!isTeacher && teacherName && (
-            <p className="text-xs text-muted-text mt-0.5">with {teacherName}</p>
-          )}
+          {teacherLine}
+          {studentsLine}
         </div>
         {joinRow}
       </li>
@@ -161,14 +204,24 @@ export default function ScheduleItemCard({
           >
             {startTimeLabel}
           </span>
-          <Link
-            href={classHref}
-            className={`text-sm font-semibold hover:underline ${
-              isCancelled ? "text-muted-text line-through" : "text-dark-text"
-            }`}
-          >
-            {heading}
-          </Link>
+          {classHref ? (
+            <Link
+              href={classHref}
+              className={`text-sm font-semibold hover:underline ${
+                isCancelled ? "text-muted-text line-through" : "text-dark-text"
+              }`}
+            >
+              {heading}
+            </Link>
+          ) : (
+            <span
+              className={`text-sm font-semibold ${
+                isCancelled ? "text-muted-text line-through" : "text-dark-text"
+              }`}
+            >
+              {heading}
+            </span>
+          )}
           {isCancelled && (
             <span className="text-xs font-medium text-red-500 uppercase tracking-wide">
               Cancelled
@@ -179,9 +232,9 @@ export default function ScheduleItemCard({
         {showClassName && (
           <p className="text-xs text-muted-text mt-0.5">{item.className}</p>
         )}
-        {!isTeacher && teacherName && (
-          <p className="text-xs text-muted-text mt-0.5">with {teacherName}</p>
-        )}
+        {teacherLine}
+        {studentsLine}
+        {takeClassRow}
       </div>
       {joinRow}
     </li>

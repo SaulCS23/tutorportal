@@ -32,13 +32,21 @@ export default function ScheduleView({
   schedules,
   meetings,
   teacherMap,
+  studentsByClass = {},
   isTeacher,
+  viewerTeacherId = null,
   todayISO,
 }: {
   schedules: RawClassSchedule[];
   meetings: RawClassMeeting[];
   teacherMap: Record<string, string>;
+  /** class_id -> enrolled student names, teacher (master schedule) view only. */
+  studentsByClass?: Record<string, string[]>;
   isTeacher: boolean;
+  /** The viewing teacher's own profile id — used to tell "my class" apart
+   *  from another teacher's (or an unassigned) class on the shared
+   *  master schedule. Always null for students. */
+  viewerTeacherId?: string | null;
   todayISO: string;
 }) {
   // Computed server-side and passed down as a plain string so the very
@@ -169,6 +177,8 @@ export default function ScheduleView({
             days={agendaDays}
             isTeacher={isTeacher}
             teacherMap={teacherMap}
+            studentsByClass={studentsByClass}
+            viewerTeacherId={viewerTeacherId}
             onPrevWeek={goPrevWeek}
             onNextWeek={goNextWeek}
             onOpenMeeting={setOpenMeetingItem}
@@ -180,6 +190,7 @@ export default function ScheduleView({
             items={upcoming}
             isTeacher={isTeacher}
             teacherMap={teacherMap}
+            viewerTeacherId={viewerTeacherId}
             onOpenMeeting={setOpenMeetingItem}
           />
         </div>
@@ -189,9 +200,11 @@ export default function ScheduleView({
         <MeetingDetailModal
           item={openMeetingItem}
           teacherName={
-            isTeacher || !openMeetingItem.teacherId ? null : teacherMap[openMeetingItem.teacherId]
+            openMeetingItem.teacherId ? teacherMap[openMeetingItem.teacherId] ?? null : null
           }
+          studentNames={studentsByClass[openMeetingItem.classId] ?? []}
           isTeacher={isTeacher}
+          viewerTeacherId={viewerTeacherId}
           onClose={() => setOpenMeetingItem(null)}
         />
       )}

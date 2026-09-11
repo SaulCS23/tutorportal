@@ -35,6 +35,22 @@ export function getInitials(
 }
 
 /**
+ * Splits a single full-name input into first/last tokens the same way
+ * the profiles_names migration backfills existing rows: first = first
+ * whitespace-delimited token, last = last token (null when only one
+ * word). Used at signup, where the name is now captured as one field.
+ */
+export function splitFullName(fullName: string): { firstName: string; lastName: string | null } {
+  const trimmed = fullName.trim().replace(/\s+/g, " ");
+  if (!trimmed) return { firstName: "", lastName: null };
+
+  const parts = trimmed.split(" ");
+  if (parts.length === 1) return { firstName: parts[0], lastName: null };
+
+  return { firstName: parts[0], lastName: parts[parts.length - 1] };
+}
+
+/**
  * The app's documented fallback timezone — re-exported here so existing
  * imports of `APP_TIMEZONE` from lib/utils keep working. lib/timezone.ts
  * (as DEFAULT_TIMEZONE) is the source of truth; do not redefine this.

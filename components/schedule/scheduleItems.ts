@@ -11,7 +11,7 @@ export type RawClassSchedule = {
   meeting_provider: string | null;
   meeting_link: string | null;
   location: string | null;
-  classes: { name: string; subject: string | null; teacher_id: string } | null;
+  classes: { name: string; subject: string | null; teacher_id: string | null } | null;
 };
 
 export type RawClassMeeting = {
@@ -26,7 +26,7 @@ export type RawClassMeeting = {
   meeting_link: string | null;
   location: string | null;
   status: "scheduled" | "completed" | "cancelled" | "group_pending_reschedule";
-  classes: { name: string; subject: string | null; teacher_id: string } | null;
+  classes: { name: string; subject: string | null; teacher_id: string | null } | null;
 };
 
 export type ScheduleItem = {

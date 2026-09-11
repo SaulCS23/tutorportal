@@ -13,6 +13,16 @@ export async function GET(request: Request) {
     const supabase = await createClient();
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
+      // No-op for every flow except a freshly-verified Flow A signup (see
+      // supabase/migrations/20240121000000_preapproved_students.sql) —
+      // safe to call unconditionally on every callback, including
+      // password-reset confirmations.
+      const { error: claimError } = await supabase.rpc(
+        "claim_preapproved_student_from_own_metadata"
+      );
+      if (claimError) {
+        console.error("[auth/callback] claim_preapproved_student error:", claimError.message);
+      }
       return NextResponse.redirect(`${origin}${next}`);
     }
   }

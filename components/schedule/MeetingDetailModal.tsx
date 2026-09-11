@@ -13,6 +13,7 @@ import DatePicker from "@/components/ui/DatePicker";
 import StatusBadge from "@/components/ui/StatusBadge";
 import JoinMeetingLink from "./JoinMeetingLink";
 import AttendanceSection from "./AttendanceSection";
+import TakeClassButton from "./TakeClassButton";
 import type { ScheduleItem } from "./scheduleItems";
 import {
   getMeetingCancellationEligibility,
@@ -55,18 +56,28 @@ const REQUEST_STATUS_LABEL: Record<MakeupRequest["status"], string> = {
 export default function MeetingDetailModal({
   item,
   teacherName,
+  studentNames = [],
   isTeacher = false,
+  viewerTeacherId = null,
   onClose,
 }: {
   item: ScheduleItem;
   teacherName?: string | null;
+  /** Enrolled student names, teacher (master schedule) view only. */
+  studentNames?: string[];
   /** Renders a teacher-appropriate, read-only body instead of the
    *  student cancellation/makeup-request flow — the eligibility and
    *  "own request" RPCs below are student-scoped (a teacher has no
    *  "own" makeup request), so they're skipped entirely for teachers. */
   isTeacher?: boolean;
+  /** The viewing teacher's own profile id — null for students, and for
+   *  a teacher viewing a class that isn't theirs (including unassigned)
+   *  this won't match item.teacherId, which switches the body below to
+   *  a read-only summary plus (when unassigned) a Take Class action. */
+  viewerTeacherId?: string | null;
   onClose: () => void;
 }) {
+  const isOwnClass = isTeacher && item.teacherId === viewerTeacherId;
   const viewerTimezone = useViewerTimezone();
   const [loading, setLoading] = useState(!isTeacher);
   const [eligibility, setEligibility] = useState<MeetingCancellationEligibility | null>(null);
@@ -242,7 +253,17 @@ export default function MeetingDetailModal({
               {formatZonedTime(endInstant.toISOString(), viewerTimezone)}{" "}
               <span className="text-xs text-slate-400">({viewerTimezone})</span>
             </p>
-            {teacherName && <p className="text-muted-text">with {teacherName}</p>}
+            {isTeacher ? (
+              <p className="text-muted-text">
+                Teacher:{" "}
+                {teacherName ?? <span className="text-amber-600 font-medium">Unassigned</span>}
+              </p>
+            ) : (
+              teacherName && <p className="text-muted-text">with {teacherName}</p>
+            )}
+            {isTeacher && studentNames.length > 0 && (
+              <p className="text-muted-text">Students: {studentNames.join(", ")}</p>
+            )}
             {item.location && (
               <p className="flex items-center gap-2 text-dark-text">
                 <MapPin size={14} className="text-muted-text shrink-0" aria-hidden="true" />
@@ -262,7 +283,11 @@ export default function MeetingDetailModal({
             )}
           </div>
 
-          {item.status !== "cancelled" && (
+          {/* Attendance is a teaching action, scoped to the class's own
+              responsible teacher — a teacher just browsing the shared
+              master schedule for another (or an unassigned) class does
+              not get to view or mark it. */}
+          {item.status !== "cancelled" && (!isTeacher || isOwnClass) && (
             <AttendanceSection
               meetingId={item.id}
               classId={item.classId}
@@ -272,7 +297,16 @@ export default function MeetingDetailModal({
           )}
 
           <div className="border-t border-soft-border pt-4">
-            {isTeacher ? (
+            {isTeacher && !isOwnClass ? (
+              <div className="flex flex-col gap-3">
+                <p className="text-sm text-muted-text">
+                  {teacherName
+                    ? `This class is managed by ${teacherName}.`
+                    : "This class doesn't have a responsible teacher yet."}
+                </p>
+                {!item.teacherId && <TakeClassButton classId={item.classId} />}
+              </div>
+            ) : isTeacher ? (
               <div className="flex flex-col gap-3">
                 {item.status === "cancelled" ? (
                   <p className="text-sm text-muted-text">This meeting has been cancelled.</p>

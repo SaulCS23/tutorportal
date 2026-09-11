@@ -34,7 +34,7 @@ type ClassRow = {
   subject: string | null;
   description: string | null;
   start_date: string | null;
-  teacher_id: string;
+  teacher_id: string | null;
   join_code: string;
   created_at: string;
 };
@@ -126,11 +126,9 @@ export default async function ClassDetailPage({ params }: Props) {
   const timezone = resolveTimeZone(profile?.timezone);
 
   const [teacherResult, countResult] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select("full_name")
-      .eq("id", typedCls.teacher_id)
-      .single(),
+    typedCls.teacher_id
+      ? supabase.from("profiles").select("full_name").eq("id", typedCls.teacher_id).single()
+      : Promise.resolve({ data: null }),
     supabase
       .from("class_members")
       .select("*", { count: "exact", head: true })
@@ -138,7 +136,7 @@ export default async function ClassDetailPage({ params }: Props) {
   ]);
 
   const teacherName =
-    (teacherResult.data as { full_name: string } | null)?.full_name ?? "Unknown";
+    (teacherResult.data as { full_name: string } | null)?.full_name ?? "Unassigned";
   const memberCount = countResult.count ?? 0;
 
   // Parallel: students (teacher only), schedule, meetings, assignments, announcements
